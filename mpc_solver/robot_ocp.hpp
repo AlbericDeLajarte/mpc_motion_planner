@@ -17,8 +17,8 @@
 
 using namespace std;
 
-#define POLY_ORDER 10
-#define NUM_SEG    1
+#define POLY_ORDER 4
+#define NUM_SEG    3
 
 /** benchmark the new collocation class */
 using Polynomial = polympc::Chebyshev<POLY_ORDER, polympc::GAUSS_LOBATTO, float>;
