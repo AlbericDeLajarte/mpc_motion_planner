@@ -29,9 +29,17 @@ int main(int, char**) {
     using mpc_t = MPC<guidance_ocp, MySolver, admm>;
     mpc_t mpc;
 
+    double final_time = 3;
+
+    mpc.ocp().Q.setIdentity();
+    mpc.ocp().R.setZero();
+    mpc.ocp().QN.setIdentity();
+
+    // mpc.ocp().x_ref
+
     mpc.settings().max_iter = 10; 
     mpc.settings().line_search_max_iter = 10;
-    mpc.set_time_limits(0, 1);
+    mpc.set_time_limits(0, final_time);
     // mpc.m_solver.settings().scaling = 10;
 
     // Input constraints and initialisation -------------
@@ -58,11 +66,14 @@ int main(int, char**) {
     mpc.state_bounds(lbx, ubx);
     
     // Final state
-    mpc_t::state_t final_state; 
-    final_state.head(7) = qTarget;
-    final_state.tail(7) = Eigen::Matrix<float, 7, 1>::Zero();
+    // mpc_t::state_t final_state; 
+    // final_state.head(7) = qTarget;
+    // final_state.tail(7) = Eigen::Matrix<float, 7, 1>::Zero();
 
-    mpc.final_state_bounds(final_state.array() - eps, final_state.array() + eps);
+    mpc.ocp().x_ref.head(7) = qTarget;
+    mpc.ocp().x_ref.tail(7) = Eigen::Matrix<float, 7, 1>::Zero();
+
+    // mpc.final_state_bounds(final_state.array() - eps, final_state.array() + eps);
 
     // Initial state
     mpc_t::state_t x0; x0 << 0.0, 0.0, 0.0, -1.5, 0.0, 1.5, 0.0,
@@ -72,12 +83,12 @@ int main(int, char**) {
     mpc.x_guess(x0.replicate(mpc.ocp().NUM_NODES,1));	
     
     // Parameters
-    mpc_t::parameter_t lbp; lbp << 0.0;  // lower bound on time
-    mpc_t::parameter_t ubp; ubp << 20;   // upper bound on time
-    mpc_t::parameter_t p0; p0 << 5;     // very important to set initial time estimate
+    // mpc_t::parameter_t lbp; lbp << 0.0;  // lower bound on time
+    // mpc_t::parameter_t ubp; ubp << 20;   // upper bound on time
+    // mpc_t::parameter_t p0; p0 << 5;     // very important to set initial time estimate
 
-    mpc.parameters_bounds(lbp, ubp);
-    mpc.p_guess(p0);
+    // mpc.parameters_bounds(lbp, ubp);
+    // mpc.p_guess(p0);
 
     // Solve problem and save solution 
     for(int i=0; i<5; i++){
@@ -112,9 +123,9 @@ int main(int, char**) {
         int nPoints = 100;
         for (int iPoint = 0; iPoint<nPoints; iPoint++)
         {
-            float time = 1.0/nPoints * iPoint;
+            float time = final_time/nPoints * iPoint;
 
-            logFile << time*mpc.solution_p()[0] << " " 
+            logFile << time << " " 
                     << mpc.solution_x_at(time).transpose() << " " 
                     << mpc.solution_u_at(time).transpose() << " " 
                     << std::endl;

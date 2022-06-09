@@ -24,13 +24,19 @@ using namespace std;
 using Polynomial = polympc::Chebyshev<POLY_ORDER, polympc::GAUSS_LOBATTO, float>;
 using Approximation = polympc::Spline<Polynomial, NUM_SEG>;
 
-POLYMPC_FORWARD_DECLARATION(/*Name*/ guidance_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 1, /*ND*/ 0, /*NG*/0, /*TYPE*/ float)
+POLYMPC_FORWARD_DECLARATION(/*Name*/ guidance_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 0, /*ND*/ 0, /*NG*/0, /*TYPE*/ float)
 using namespace Eigen;
 
 class guidance_ocp : public ContinuousOCP<guidance_ocp, Approximation, DENSE>
 {
 public:
     ~guidance_ocp() = default;
+
+    Matrix<scalar_t, 14, 14> Q;
+    Matrix<scalar_t, 7, 7> R;
+    Matrix<scalar_t, 14, 14> QN;
+
+    Matrix<scalar_t, 14, 1> x_ref;
 
     template<typename T>
     inline void dynamics_impl(const Eigen::Ref<const state_t<T>> x, const Eigen::Ref<const control_t<T>> u,
@@ -47,7 +53,7 @@ public:
         xdot.segment(7, 7) = u;
 
         // Scaling dynamic with time parameter        
-        xdot *= p(0);
+        // xdot *= p(0);
         
         polympc::ignore_unused_var(t);
     }
@@ -57,7 +63,10 @@ public:
                                    const Eigen::Ref<const parameter_t<T>> p, const Eigen::Ref<const static_parameter_t> d,
                                    const scalar_t &t, T &lagrange) noexcept
     {
-        lagrange = (T)0.0;
+        Matrix<T, 14, 1> x_error = x - x_ref.template cast<T>();
+        lagrange = x_error.dot(Q.template cast<T>() * x_error) + u.dot(R.template cast<T>() * u);
+        
+        // lagrange = (T)0.0;
     }
 
     template<typename T>
@@ -65,12 +74,15 @@ public:
                                 const Eigen::Ref<const parameter_t<T>> p, const Eigen::Ref<const static_parameter_t> d,
                                 const scalar_t &t, T &mayer) noexcept
     {   
-        mayer = p(0);
+        Matrix<T, 14, 1> x_error = x - x_ref.template cast<T>();
+        mayer = x_error.dot(QN.template cast<T>() * x_error);
+
+        // mayer = (T)0.0;
 
         // polympc::ignore_unused_var(x);
-        polympc::ignore_unused_var(u);
-        polympc::ignore_unused_var(d);
-        polympc::ignore_unused_var(t);
+        // polympc::ignore_unused_var(u);
+        // polympc::ignore_unused_var(d);
+        // polympc::ignore_unused_var(t);
   
     }
 };
