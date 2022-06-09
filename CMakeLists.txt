@@ -8,6 +8,6 @@ find_package(pinocchio REQUIRED)
 
   
 include_directories(submodules/polympc/src)
-
+ 
 add_executable(mpc_motion_planner main.cpp robot/pandaWrapper.cpp)
 target_link_libraries (mpc_motion_planner Eigen3::Eigen pinocchio::pinocchio)

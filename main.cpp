@@ -3,7 +3,7 @@
 #include "solver/rocket_mpc.hpp"
 #include "solver/polympc_redef.hpp" 
 
-#include "robot/pandaWrapper.hpp"
+// #include "robot/pandaWrapper.hpp"
 
 
 
@@ -19,8 +19,8 @@ int main(int, char**) {
 
     // ---------- Pinocchio setup ---------- //
 
-    PandaWrapper myRobot;
-    Eigen::VectorXd qTarget = myRobot.inverse_kinematic(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0.5, 0., 0.5));
+    // PandaWrapper myRobot;
+    // Eigen::VectorXd qTarget = myRobot.inverse_kinematic(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0.5, 0., 0.5));
 
     
     // ---------- PolyMPC setup ---------- //
@@ -106,17 +106,22 @@ int main(int, char**) {
 
     // Write data to txt file
     std::ofstream logFile;
-    logFile.open("../data/optimal_solution.txt");
+    logFile.open("data/optimal_solution.txt");
+    if(logFile.is_open()){
 
-    int nPoints = 100;
-    for (int iPoint = 0; iPoint<nPoints; iPoint++)
-    {
-        double time = 1.0/nPoints * iPoint;
+        int nPoints = 100;
+        for (int iPoint = 0; iPoint<nPoints; iPoint++)
+        {
+            double time = 1.0/nPoints * iPoint;
 
-        logFile << time*mpc.solution_p()[0] << " " 
-                << mpc.solution_x_at(time).transpose() << " " 
-                << mpc.solution_u_at(time).transpose() << " " 
-                << std::endl;
+            logFile << time*mpc.solution_p()[0] << " " 
+                    << mpc.solution_x_at(time).transpose() << " " 
+                    << mpc.solution_u_at(time).transpose() << " " 
+                    << std::endl;
+        }
+    }
+    else {
+        std::cout << "\n !! COULD NOT OPEN FILE !!\n Data won't be saved " << std::endl;
     }
 
 }
