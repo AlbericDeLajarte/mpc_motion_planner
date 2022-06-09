@@ -6,7 +6,8 @@ set (CMAKE_CXX_STANDARD 11)
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(pinocchio REQUIRED)
 
-  
+add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=1000000) # 1 MB
+
 include_directories(submodules/polympc/src)
  
 add_executable(mpc_motion_planner main.cpp robot/pandaWrapper.cpp)

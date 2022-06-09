@@ -19,13 +19,12 @@ using namespace std;
 
 #define POLY_ORDER 10
 #define NUM_SEG    1
-#define NUM_EXP    1
 
 /** benchmark the new collocation class */
-using Polynomial = polympc::Chebyshev<POLY_ORDER, polympc::GAUSS_LOBATTO, double>;
+using Polynomial = polympc::Chebyshev<POLY_ORDER, polympc::GAUSS_LOBATTO, float>;
 using Approximation = polympc::Spline<Polynomial, NUM_SEG>;
 
-POLYMPC_FORWARD_DECLARATION(/*Name*/ guidance_ocp, /*NX*/ 3, /*NU*/ 1, /*NP*/ 1, /*ND*/ 0, /*NG*/0, /*TYPE*/ double)
+POLYMPC_FORWARD_DECLARATION(/*Name*/ guidance_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 1, /*ND*/ 0, /*NG*/0, /*TYPE*/ float)
 using namespace Eigen;
 
 class guidance_ocp : public ContinuousOCP<guidance_ocp, Approximation, DENSE>
@@ -38,20 +37,14 @@ public:
                               const Eigen::Ref<const parameter_t<T>> p, const Eigen::Ref<const static_parameter_t> &d,
                               const T &t, Eigen::Ref<state_t<T>> xdot) const noexcept
     {
-        // -------------- Simulation variables -----------------------------
-        T mass = (T)20;                   // Instantaneous mass of the rocekt in [kg]
-        T g0 = (T)9.81;
 
         // -------------- Differential equation ---------------------
 
-        // Position variation is mass
-        xdot(0) = x(1);
+        // Position variation is joint velocity
+        xdot.head(7) = x.segment(7, 7);
 
-        // Speed variation is Force/mass
-        xdot(1) = u(0)/mass - g0;
-
-        // Mass variation is proportional to thrust
-        xdot(2) = -u(0)/(200*g0);  
+        // Joint velocity variation is input = acceleration
+        xdot.segment(7, 7) = u;
 
         // Scaling dynamic with time parameter        
         xdot *= p(0);

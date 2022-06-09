@@ -1,9 +1,9 @@
 #include <iostream>
 #include <fstream>
-#include "solver/rocket_mpc.hpp"
-#include "solver/polympc_redef.hpp" 
+#include "mpc_solver/robot_ocp.hpp"
+#include "mpc_solver/polympc_redef.hpp" 
 
-// #include "robot/pandaWrapper.hpp"
+#include "robot/pandaWrapper.hpp"
 
 
 
@@ -21,7 +21,7 @@ int main(int, char**) {
 
     // PandaWrapper myRobot;
     // Eigen::VectorXd qTarget = myRobot.inverse_kinematic(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0.5, 0., 0.5));
-
+    Eigen::Matrix<float, 7, 1> qTarget; qTarget << 0.9066, 1.16943, 1.44188, -1.31434, 1.20663, 1.786, 0.473774;
     
     // ---------- PolyMPC setup ---------- //
 
@@ -29,53 +29,52 @@ int main(int, char**) {
     using mpc_t = MPC<guidance_ocp, MySolver, admm>;
     mpc_t mpc;
 
-    mpc.settings().max_iter = 20; 
+    mpc.settings().max_iter = 10; 
     mpc.settings().line_search_max_iter = 10;
     mpc.set_time_limits(0, 1);
-    //mpc.m_solver.settings().scaling = 10;
+    // mpc.m_solver.settings().scaling = 10;
 
     // Input constraints and initialisation -------------
-    const double inf = std::numeric_limits<double>::infinity();
-    mpc_t::control_t lbu; 
-    mpc_t::control_t ubu; 
+    const float inf = std::numeric_limits<float>::infinity();
+    mpc_t::control_t max_acceleration; 
 
-    double max_thrust = 3000;
-
-    lbu << 0; // lower bound on control
-    ubu << max_thrust; // upper bound on control
-    mpc.control_bounds(lbu, ubu);  
+    max_acceleration << 15.0, 7.5, 10.0, 12.5, 15.0, 20.0, 20.0; // acceleration limit
+    mpc.control_bounds(-max_acceleration, max_acceleration);  
 
     // Initial control
-    mpc.u_guess(ubu.replicate(mpc.ocp().NUM_NODES,1));
+    // mpc.u_guess(ubu.replicate(mpc.ocp().NUM_NODES,1));
 
     // State constraints and initialisation ---------------
-    double target_apogee = 2000;
-    double propellant_mass = 10;
-    const double eps = 1e-1;
+    const float eps = 1e-2;
     mpc_t::state_t lbx; 
     mpc_t::state_t ubx; 
     
-    lbx << 0-eps,   0-eps,   0-eps;
-    ubx <<  target_apogee+eps,      330,  propellant_mass+eps;
-
+    // Position and velocity limits from https://frankaemika.github.io/docs/control_parameters.html
+    lbx << -2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973,
+            -2.1750, -2.1750, -2.1750, -2.1750, -2.6100, -2.6100, -2.6100;
+    ubx <<  2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973,
+            2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100;
+ 
     mpc.state_bounds(lbx, ubx);
     
     // Final state
-    mpc_t::state_t lbx_f; lbx_f << target_apogee-eps,   0-1,   0-eps; // lower bound on final state
-    mpc_t::state_t ubx_f; ubx_f << target_apogee+eps,   0+1,   propellant_mass+eps; // upper bound on final state
-    mpc.final_state_bounds(lbx_f, ubx_f);
+    mpc_t::state_t final_state; 
+    final_state.head(7) = qTarget;
+    final_state.tail(7) = Eigen::Matrix<float, 7, 1>::Zero();
+
+    mpc.final_state_bounds(final_state.array() - eps, final_state.array() + eps);
 
     // Initial state
-    mpc_t::state_t x0;
-    x0 <<  0, 0, propellant_mass;
-    mpc.initial_conditions(x0); 
-    
+    mpc_t::state_t x0; x0 << 0.0, 0.0, 0.0, -1.5, 0.0, 1.5, 0.0,
+                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+    mpc.initial_conditions(x0);
+
     mpc.x_guess(x0.replicate(mpc.ocp().NUM_NODES,1));	
     
     // Parameters
     mpc_t::parameter_t lbp; lbp << 0.0;  // lower bound on time
-    mpc_t::parameter_t ubp; ubp << 50;   // upper bound on time
-    mpc_t::parameter_t p0; p0 << 30;     // very important to set initial time estimate
+    mpc_t::parameter_t ubp; ubp << 20;   // upper bound on time
+    mpc_t::parameter_t p0; p0 << 5;     // very important to set initial time estimate
 
     mpc.parameters_bounds(lbp, ubp);
     mpc.p_guess(p0);
@@ -88,7 +87,7 @@ int main(int, char**) {
         
         auto stop = system_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
-        double dT = duration.count()*1e-3;
+        float dT = duration.count()*1e-3;
        
         /** retrieve solution and statistics */
         std::cout << "MPC status: " << mpc.info().status.value << "\n";
@@ -102,6 +101,7 @@ int main(int, char**) {
         << "-------------\n";
 
         mpc.x_guess(mpc.solution_x());	
+        mpc.u_guess(mpc.solution_u());
     }
 
     // Write data to txt file
@@ -112,7 +112,7 @@ int main(int, char**) {
         int nPoints = 100;
         for (int iPoint = 0; iPoint<nPoints; iPoint++)
         {
-            double time = 1.0/nPoints * iPoint;
+            float time = 1.0/nPoints * iPoint;
 
             logFile << time*mpc.solution_p()[0] << " " 
                     << mpc.solution_x_at(time).transpose() << " " 
