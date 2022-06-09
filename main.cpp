@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include "rocket_mpc.hpp"
 // #include "Robot_ocp.hpp"
 #include "polympc_redef.hpp" 
@@ -80,7 +81,7 @@ int main(int, char**) {
     using mpc_t = MPC<guidance_ocp, MySolver, admm>;
     mpc_t mpc;
 
-    mpc.settings().max_iter = 10; 
+    mpc.settings().max_iter = 20; 
     mpc.settings().line_search_max_iter = 10;
     mpc.set_time_limits(0, 1);
     //mpc.m_solver.settings().max_iter = 1000;
@@ -104,65 +105,73 @@ int main(int, char**) {
     double target_apogee = 2000;
     double propellant_mass = 10;
     const double eps = 1e-1;
-    mpc_t::state_t lbx; 
-    mpc_t::state_t ubx; 
+    // mpc_t::state_t lbx; 
+    // mpc_t::state_t ubx; 
     
-    lbx << -inf, -inf, -inf,    -inf, -inf, -inf,   0-eps,   0-eps;
-    ubx <<  inf,  inf, inf,      inf,  inf, inf,    propellant_mass+eps, 50;
+    // lbx << -inf, -inf, -inf,    -inf, -inf, -inf,   0-eps,   0-eps;
+    // ubx <<  inf,  inf, inf,      inf,  inf, inf,    propellant_mass+eps, 50;
     
-    // lbx << -inf, -inf, -inf,   -inf, -inf, -inf,   -inf;
-    // ubx <<  inf,  inf, inf,     inf,  inf, inf,     inf;
-    mpc.state_bounds(lbx, ubx);
+    // // lbx << -inf, -inf, -inf,   -inf, -inf, -inf,   -inf;
+    // // ubx <<  inf,  inf, inf,     inf,  inf, inf,     inf;
+    // mpc.state_bounds(lbx, ubx);
     
     // Final state
-    mpc_t::state_t lbx_f; lbx_f << -inf, -inf, target_apogee-eps,   -inf, -inf, 0-1,   0-eps,   0-eps; // lower bound on final state
-    mpc_t::state_t ubx_f; ubx_f <<  inf,  inf, target_apogee+eps,    inf,  inf, 0+1,   propellant_mass+eps, 50; // upper bound on final state
+    mpc_t::state_t lbx_f; lbx_f << target_apogee-eps,   0-1,   0-eps; // lower bound on final state
+    mpc_t::state_t ubx_f; ubx_f << target_apogee+eps,   0+1,   propellant_mass+eps; // upper bound on final state
     mpc.final_state_bounds(lbx_f, ubx_f);
 
     // Initial state
-    mpc_t::state_t x0_inf, x0_sup;
-    x0_inf <<   0, 0, 0,
-                0, 0, 0,
-                propellant_mass,
-                0;
-    x0_sup = x0_inf;
-    x0_sup(7) = 50;
-    mpc.initial_conditions(x0_inf, x0_sup); 
+    mpc_t::state_t x0;
+    x0 <<  0, 0, propellant_mass;
+    mpc.initial_conditions(x0); 
     
-    mpc.x_guess(x0_sup.replicate(mpc.ocp().NUM_NODES,1));	
+    mpc.x_guess(x0.replicate(mpc.ocp().NUM_NODES,1));	
     
     // Parameters
-    // mpc_t::parameter_t lbp; lbp << 0.0;  // lower bound on time
-    // mpc_t::parameter_t ubp; ubp << 50;   // upper bound on time
-    // mpc_t::parameter_t p0; p0 << 30;     // very important to set initial time estimate
+    mpc_t::parameter_t lbp; lbp << 0.0;  // lower bound on time
+    mpc_t::parameter_t ubp; ubp << 50;   // upper bound on time
+    mpc_t::parameter_t p0; p0 << 30;     // very important to set initial time estimate
 
-    // mpc.parameters_bounds(lbp, ubp);
-    // mpc.p_guess(p0);
-
-    mpc.ocp().cos_vertical_angle = 1;
+    mpc.parameters_bounds(lbp, ubp);
+    mpc.p_guess(p0);
 
     // Solve problem and save solution 
-    for(int i=0; i<10; i++){
+    for(int i=0; i<5; i++){
         auto start = system_clock::now();
 
         mpc.solve(); 
         
         auto stop = system_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
-        double dT = duration.count()*1e-6;
+        double dT = duration.count()*1e-3;
        
         /** retrieve solution and statistics */
         std::cout << "MPC status: " << mpc.info().status.value << "\n";
         std::cout << "Num iterations: " << mpc.info().iter << "\n";
-        std::cout << "Solve time: " << dT << " [s] \n";
+        std::cout << "Solve time: " << dT << " [ms] \n";
 
-        // std::cout << "Final time: " << mpc.solution_p().transpose() << endl;
+        std::cout << "Final time: " << mpc.solution_p().transpose() << endl;
 
-        std::cout << "Solution X: \n" << mpc.solution_x().reshaped(8, 11).transpose() << "\n";
+        // std::cout << "Solution X: \n" << mpc.solution_x().reshaped(3, 6).transpose() << "\n";
         std::cout << "Solution U: " << mpc.solution_u().transpose() << "\n"
         << "-------------\n";
 
-        // mpc.x_guess(mpc.solution_x());	
+        mpc.x_guess(mpc.solution_x());	
+    }
+
+    // Write data to txt file
+    std::ofstream logFile;
+    logFile.open("../data/optimal_solution.txt");
+
+    int nPoints = 100;
+    for (int iPoint = 0; iPoint<nPoints; iPoint++)
+    {
+        double time = 1.0/nPoints * iPoint;
+
+        logFile << time*mpc.solution_p()[0] << " " 
+                << mpc.solution_x_at(time).transpose() << " " 
+                << mpc.solution_u_at(time).transpose() << " " 
+                << std::endl;
     }
 
 }
