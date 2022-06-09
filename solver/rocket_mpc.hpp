@@ -51,8 +51,9 @@ public:
         xdot(1) = u(0)/mass - g0;
 
         // Mass variation is proportional to thrust
-        xdot(2) = -u(0)/(200*g0);  // When parameters are working -> Use if(t<p(0))
-                
+        xdot(2) = -u(0)/(200*g0);  
+
+        // Scaling dynamic with time parameter        
         xdot *= p(0);
         
         polympc::ignore_unused_var(t);
@@ -63,7 +64,6 @@ public:
                                    const Eigen::Ref<const parameter_t<T>> p, const Eigen::Ref<const static_parameter_t> d,
                                    const scalar_t &t, T &lagrange) noexcept
     {
-        //lagrange = -1e-1*x(6);
         lagrange = (T)0.0;
     }
 

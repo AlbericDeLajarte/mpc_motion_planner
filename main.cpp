@@ -1,81 +1,29 @@
 #include <iostream>
 #include <fstream>
-#include "rocket_mpc.hpp"
-// #include "Robot_ocp.hpp"
-#include "polympc_redef.hpp" 
+#include "solver/rocket_mpc.hpp"
+#include "solver/polympc_redef.hpp" 
+
+#include "robot/pandaWrapper.hpp"
+
 
 
 using namespace Eigen;
 using namespace std;
 using namespace std::chrono;
 
-// using box_admm_solver = boxADMM<RobotOCP::VAR_SIZE, RobotOCP::NUM_EQ, RobotOCP::scalar_t,
-//                                 RobotOCP::MATRIXFMT, linear_solver_traits<RobotOCP::MATRIXFMT>::default_solver>;
-
-// int main(void)
-// {
-//     /** create an MPC algorithm and set the prediction horison */
-//     using mpc_t = MPC<RobotOCP, MySolver, box_admm_solver>;
-//     mpc_t mpc;
-//     mpc.settings().max_iter = 20;
-//     mpc.settings().line_search_max_iter = 10;
-//     mpc.set_time_limits(0, 2);
-
-//     /** problem data */
-//     mpc_t::static_param p; p << 2.0;          // robot wheel base
-//     mpc_t::state_t x0; x0 << 0.5, 0.5, 0.5;   // initial condition
-//     mpc_t::control_t lbu; lbu << -1.5, -0.75; // lower bound on control
-//     mpc_t::control_t ubu; ubu <<  1.5,  0.75; // upper bound on control
-
-//     mpc.set_static_parameters(p);
-//     mpc.control_bounds(lbu, ubu);
-//     mpc.initial_conditions(x0);
-
-//     /** solve */
-//     polympc::time_point start = polympc::get_time();
-//     mpc.solve();
-//     polympc::time_point stop = polympc::get_time();
-//     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-
-//     /** retrieve solution and statistics */
-//     std::cout << "MPC status: " << mpc.info().status.value << "\n";
-//     std::cout << "Num iterations: " << mpc.info().iter << "\n";
-//     std::cout << "Solve time: " << std::setprecision(9) << static_cast<double>(duration.count()) << "[mc] \n";
-
-//     std::cout << "Solution X: " << mpc.solution_x().transpose() << "\n";
-//     std::cout << "Solution U: " << mpc.solution_u().transpose() << "\n";
-
-//     /** sample x solution at collocation points [0, 5, 10] */
-//     std::cout << "x[0]: " << mpc.solution_x_at(0).transpose() << "\n";
-//     std::cout << "x[5]: " << mpc.solution_x_at(5).transpose() << "\n";
-//     std::cout << "x[10]: " << mpc.solution_x_at(10).transpose() << "\n";
-
-//     std::cout << " ------------------------------------------------ \n";
-
-//     /** sample control at collocation points */
-//     std::cout << "u[0]: " << mpc.solution_u_at(0).transpose() << "\n";
-//     std::cout << "u[1]: " << mpc.solution_u_at(1).transpose() << "\n";
-
-//     std::cout << " ------------------------------------------------ \n";
-
-//     /** sample state at time 't = [0.0, 0.5]' */
-//     std::cout << "x(0.0): " << mpc.solution_x_at(0.0).transpose() << "\n";
-//     std::cout << "x(0.5): " << mpc.solution_x_at(0.5).transpose() << "\n";
-
-//     std::cout << " ------------------------------------------------ \n";
-
-//     /**  sample control at time 't = [0.0, 0.5]' */
-//     std::cout << "u(0.0): " << mpc.solution_u_at(0.0).transpose() << "\n";
-//     std::cout << "u(0.5): " << mpc.solution_u_at(0.5).transpose() << "\n";
-
-//     return EXIT_SUCCESS;
-// }
-
 
 using admm = boxADMM<guidance_ocp::VAR_SIZE, guidance_ocp::NUM_EQ, guidance_ocp::scalar_t,
                 guidance_ocp::MATRIXFMT, linear_solver_traits<guidance_ocp::MATRIXFMT>::default_solver>;
 
 int main(int, char**) {
+
+    // ---------- Pinocchio setup ---------- //
+
+    PandaWrapper myRobot;
+    Eigen::VectorXd qTarget = myRobot.inverse_kinematic(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0.5, 0., 0.5));
+
+    
+    // ---------- PolyMPC setup ---------- //
 
     // Creates solver
     using mpc_t = MPC<guidance_ocp, MySolver, admm>;
@@ -84,7 +32,6 @@ int main(int, char**) {
     mpc.settings().max_iter = 20; 
     mpc.settings().line_search_max_iter = 10;
     mpc.set_time_limits(0, 1);
-    //mpc.m_solver.settings().max_iter = 1000;
     //mpc.m_solver.settings().scaling = 10;
 
     // Input constraints and initialisation -------------
@@ -105,15 +52,13 @@ int main(int, char**) {
     double target_apogee = 2000;
     double propellant_mass = 10;
     const double eps = 1e-1;
-    // mpc_t::state_t lbx; 
-    // mpc_t::state_t ubx; 
+    mpc_t::state_t lbx; 
+    mpc_t::state_t ubx; 
     
-    // lbx << -inf, -inf, -inf,    -inf, -inf, -inf,   0-eps,   0-eps;
-    // ubx <<  inf,  inf, inf,      inf,  inf, inf,    propellant_mass+eps, 50;
-    
-    // // lbx << -inf, -inf, -inf,   -inf, -inf, -inf,   -inf;
-    // // ubx <<  inf,  inf, inf,     inf,  inf, inf,     inf;
-    // mpc.state_bounds(lbx, ubx);
+    lbx << 0-eps,   0-eps,   0-eps;
+    ubx <<  target_apogee+eps,      330,  propellant_mass+eps;
+
+    mpc.state_bounds(lbx, ubx);
     
     // Final state
     mpc_t::state_t lbx_f; lbx_f << target_apogee-eps,   0-1,   0-eps; // lower bound on final state
