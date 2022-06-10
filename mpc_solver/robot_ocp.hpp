@@ -17,7 +17,7 @@
 
 using namespace std;
 
-#define POLY_ORDER 4
+#define POLY_ORDER 5
 #define NUM_SEG    3
 
 /** benchmark the new collocation class */
@@ -27,7 +27,7 @@ using Approximation = polympc::Spline<Polynomial, NUM_SEG>;
 POLYMPC_FORWARD_DECLARATION(/*Name*/ minTime_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 1, /*ND*/ 0, /*NG*/0, /*TYPE*/ double)
 using namespace Eigen;
 
-class minTime_ocp : public ContinuousOCP<minTime_ocp, Approximation, DENSE>
+class minTime_ocp : public ContinuousOCP<minTime_ocp, Approximation, SPARSE>
 {
 public:
     ~minTime_ocp() = default;

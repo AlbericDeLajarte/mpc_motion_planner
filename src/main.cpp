@@ -18,7 +18,7 @@ int main(int, char**) {
     using mpc_t = MPC<minTime_ocp, MySolver, admm>;
     mpc_t mpc;
 
-    mpc.settings().max_iter = 10; 
+    mpc.settings().max_iter = 100; 
     mpc.settings().line_search_max_iter = 10;
     mpc.set_time_limits(0, 1);
     // mpc.m_solver.settings().scaling = 10;
@@ -46,10 +46,9 @@ int main(int, char**) {
     // Parameters ------------------
     mpc_t::parameter_t lbp; lbp << 0.0;  // lower bound on time
     mpc_t::parameter_t ubp; ubp << 10;   // upper bound on time
-    mpc_t::parameter_t p0; p0 << 3;     // very important to set initial time estimate
 
     mpc.parameters_bounds(lbp, ubp);
-    mpc.p_guess(p0);    
+    
 
 
 
@@ -98,10 +97,6 @@ int main(int, char**) {
 
     // Calculate the trajectory in an offline manner (outside of the control loop)
     Result result = otg.calculate(input, trajectory);
-    if (result == Result::ErrorInvalidInput) {
-        std::cout << "Invalid input!" << std::endl;
-        return -1;
-    }
 
     // Get duration of the trajectory
     std::cout << "Trajectory duration: " << trajectory.get_duration() << " [s]." << std::endl;
@@ -118,8 +113,33 @@ int main(int, char**) {
     mpc.initial_conditions(x0);
 
     // Warm start solver
-    mpc.x_guess(x0.replicate(mpc.ocp().NUM_NODES,1));	
-    
+    mpc_t::traj_state_t x_guess;
+    mpc_t::traj_control_t u_guess;
+    mpc_t::parameter_t p0; p0 << trajectory.get_duration();
+    std::array<double, NDOF> new_position, new_velocity, new_acceleration;
+
+    auto mpc_time_grid = mpc.ocp().time_nodes;
+    int i = 0;
+    for(auto mpc_time : mpc_time_grid){
+
+        trajectory.at_time(mpc_time*trajectory.get_duration(), new_position, new_velocity, new_acceleration);
+
+        // std::cout << mpc_time*trajectory.get_duration() << std::endl;
+
+        x_guess.segment(i*NDOF*2, NDOF*2) << Map<Matrix<double, 7, 1> >(new_position.data()),
+                                             Map<Matrix<double, 7, 1> >(new_velocity.data());
+
+        u_guess.segment(i*NDOF, NDOF) << Map<Matrix<double, 7, 1> >(new_acceleration.data());
+
+        i++;
+    } 
+    // std::cout << x_guess << std::endl << x_guess.cols() << " " << x_guess.rows() << std::endl;
+    // std::cout << x_guess.reshaped(14, 13)  << std::endl;
+    // std::cout << u_guess.reshaped(7, 13)  << std::endl;
+    mpc.x_guess(x_guess);	
+    mpc.u_guess(u_guess);
+    mpc.p_guess(p0); 
+     
 
     // Solve problem and print solution 
     for(int i=0; i<5; i++){
@@ -161,10 +181,8 @@ int main(int, char**) {
         int nPoints = 100;
 
         // Log Ruckig trajectory
-        std::array<double, NDOF> new_position, new_velocity, new_acceleration;
         for (int iPoint = 0; iPoint<nPoints; iPoint++)
         {
-
             double time = trajectory.get_duration()/nPoints * iPoint;
             
             trajectory.at_time(time, new_position, new_velocity, new_acceleration);
