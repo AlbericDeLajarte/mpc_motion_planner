@@ -21,16 +21,16 @@ using namespace std;
 #define NUM_SEG    3
 
 /** benchmark the new collocation class */
-using Polynomial = polympc::Chebyshev<POLY_ORDER, polympc::GAUSS_LOBATTO, float>;
+using Polynomial = polympc::Chebyshev<POLY_ORDER, polympc::GAUSS_LOBATTO, double>;
 using Approximation = polympc::Spline<Polynomial, NUM_SEG>;
 
-POLYMPC_FORWARD_DECLARATION(/*Name*/ guidance_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 1, /*ND*/ 0, /*NG*/0, /*TYPE*/ float)
+POLYMPC_FORWARD_DECLARATION(/*Name*/ minTime_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 1, /*ND*/ 0, /*NG*/0, /*TYPE*/ double)
 using namespace Eigen;
 
-class guidance_ocp : public ContinuousOCP<guidance_ocp, Approximation, DENSE>
+class minTime_ocp : public ContinuousOCP<minTime_ocp, Approximation, DENSE>
 {
 public:
-    ~guidance_ocp() = default;
+    ~minTime_ocp() = default;
 
     template<typename T>
     inline void dynamics_impl(const Eigen::Ref<const state_t<T>> x, const Eigen::Ref<const control_t<T>> u,

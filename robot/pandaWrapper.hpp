@@ -13,6 +13,6 @@ class PandaWrapper {
     
   public:
     PandaWrapper();
-    Eigen::VectorXd inverse_kinematic(Eigen::Matrix3d orientation, Eigen::Vector3d position);
+    Eigen::Matrix<double, 7, 1> inverse_kinematic(Eigen::Matrix3d orientation, Eigen::Vector3d position);
 };
 

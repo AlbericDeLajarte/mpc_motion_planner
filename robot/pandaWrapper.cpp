@@ -6,14 +6,14 @@ PandaWrapper::PandaWrapper(){
         
 }
 
-Eigen::VectorXd PandaWrapper::inverse_kinematic(Eigen::Matrix3d orientation, Eigen::Vector3d position){
+Eigen::Matrix<double, 7, 1> PandaWrapper::inverse_kinematic(Eigen::Matrix3d orientation, Eigen::Vector3d position){
 
     pinocchio::Data data(model);
 
     const int JOINT_ID = 7;
     const pinocchio::SE3 oMdes(orientation, position);
     
-    Eigen::VectorXd q = pinocchio::neutral(model);
+    Eigen::VectorXd q = pinocchio::randomConfiguration(model);
     const double eps  = 1e-4;
     const int IT_MAX  = 1000;
     const double DT   = 1e-1;
@@ -47,22 +47,24 @@ Eigen::VectorXd PandaWrapper::inverse_kinematic(Eigen::Matrix3d orientation, Eig
         JJt.diagonal().array() += damp;
         v.noalias() = - J.transpose() * JJt.ldlt().solve(err);
         q = pinocchio::integrate(model,q,v*DT);
-        if(!(i%10))
-        std::cout << i << ": error = " << err.transpose() << std::endl;
+        // if(!(i%10))
+        // std::cout << i << ": error = " << err.transpose() << std::endl;
     }
     
-    if(success) 
-    {
-        std::cout << "Convergence achieved!" << std::endl;
-    }
-    else 
-    {
-        std::cout << "\nWarning: the iterative algorithm has not reached convergence to the desired precision" << std::endl;
-    }
+    // if(success) 
+    // {
+    //     std::cout << "Convergence achieved!" << std::endl;
+    // }
+    // else 
+    // {
+    //     std::cout << "\nWarning: the iterative algorithm has not reached convergence to the desired precision" << std::endl;
+    // }
         
-    std::cout << "\nresult: " << q.transpose() << std::endl;
-    std::cout << "\nfinal error: " << err.transpose() << std::endl;
+    // std::cout << "\nresult: " << q.transpose() << std::endl;
+    // std::cout << "\nfinal error: " << err.transpose() << std::endl;
 
-    return q;
+    Eigen::Ref<Eigen::Matrix<double, 7, 1>> qSolution(q);
+
+    return qSolution;
 
 }
