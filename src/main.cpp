@@ -1,21 +1,16 @@
-#include <iostream>
-#include <fstream>
-#include "mpc_solver/robot_ocp.hpp"
-#include "mpc_solver/polympc_redef.hpp" 
-
-#include "robot/pandaWrapper.hpp"
-
-
+#include "main.hpp"
 
 using namespace Eigen;
-using namespace std;
-using namespace std::chrono;
 
+using namespace ruckig;
 
 using admm = boxADMM<minTime_ocp::VAR_SIZE, minTime_ocp::NUM_EQ, minTime_ocp::scalar_t,
                 minTime_ocp::MATRIXFMT, linear_solver_traits<minTime_ocp::MATRIXFMT>::default_solver>;
 
-int main(int, char**) {
+int main(int, char**) { 
+
+    PandaWrapper robot;
+    MotionPlanner planner;
 
     // ---------- PolyMPC setup ---------- //
 
@@ -33,18 +28,18 @@ int main(int, char**) {
     mpc_t::state_t ubx; 
     
     // Limits from https://frankaemika.github.io/docs/control_parameters.html
-    lbx << -2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973,
-            -2.1750, -2.1750, -2.1750, -2.1750, -2.6100, -2.6100, -2.6100;
-    ubx <<  2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973,
-            2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100;
+    lbx << Map<Matrix<double, 7, 1> >(robot.min_position.data()),
+          -Map<Matrix<double, 7, 1> >(robot.max_velocity.data());
+    ubx << Map<Matrix<double, 7, 1> >(robot.max_position.data()),
+           Map<Matrix<double, 7, 1> >(robot.max_velocity.data());
     mpc.state_bounds(lbx, ubx);
 
     // Input constraints and initialisation -------------
     const double inf = std::numeric_limits<double>::infinity();
-    mpc_t::control_t max_acceleration; 
+    mpc_t::control_t max_input; 
 
-    max_acceleration << 15.0, 7.5, 10.0, 12.5, 15.0, 20.0, 20.0; // acceleration limit
-    mpc.control_bounds(-max_acceleration, max_acceleration);  
+    max_input = Map<Matrix<double, 7, 1> >(robot.max_acceleration.data()); // acceleration limit
+    mpc.control_bounds(-max_input, max_input);  
     // mpc.u_guess(ubu.replicate(mpc.ocp().NUM_NODES,1));
 
     
@@ -60,50 +55,80 @@ int main(int, char**) {
 
     // ---------- Pinocchio setup ---------- //
 
-    PandaWrapper myRobot;
-
     bool feasibleTarget = false;
     Matrix<double, 7, 1> qTarget;
     mpc_t::state_t final_state; 
     
     // Search over target configuration until one is inside joint limits
     while (feasibleTarget == false){
-        qTarget = myRobot.inverse_kinematic(Eigen::Matrix3d::Identity(), Eigen::Vector3d(0.5, 0., 0.5));
-        cout << qTarget.transpose() << endl;
+        qTarget = robot.inverse_kinematic(Matrix3d::Identity(), Vector3d(0.5, 0., 0.5));
+        std::cout << qTarget.transpose() << std::endl;
 
         // Final state
         final_state.head(7) = qTarget;
-        final_state.tail(7) = Eigen::Matrix<double, 7, 1>::Zero();
+        final_state.tail(7) = Matrix<double, 7, 1>::Zero();
 
         // Check state constraints violation
         if( (final_state.array() < ubx.array()).all() && (final_state.array() > lbx.array()).all() ){
-            cout << "OK" << endl;
+            std::cout << "OK" << std::endl;
             feasibleTarget = true;
         }
          
-        else cout << "NOT OK" << endl;
+        else std::cout << "NOT OK" << std::endl;
     }
 
+    // ---------- Ruckig setup ---------- //
+    // Create input parameters
+    InputParameter<NDOF> input;
+    input.current_position = planner.init_position;
+    input.current_velocity = planner.init_velocity;
+    input.current_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    Matrix<double, 7, 1>::Map(input.target_position.data() ) = final_state.head(7);
+    Matrix<double, 7, 1>::Map(input.target_velocity.data() ) = final_state.tail(7);
+    input.target_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    input.max_velocity = robot.max_velocity;
+    input.max_acceleration = robot.max_acceleration;
+    input.max_jerk = robot.max_jerk;
+
+    // We don't need to pass the control rate (cycle time) when using only offline features
+    Ruckig<NDOF> otg;
+    Trajectory<NDOF> trajectory;
+
+    // Calculate the trajectory in an offline manner (outside of the control loop)
+    Result result = otg.calculate(input, trajectory);
+    if (result == Result::ErrorInvalidInput) {
+        std::cout << "Invalid input!" << std::endl;
+        return -1;
+    }
+
+    // Get duration of the trajectory
+    std::cout << "Trajectory duration: " << trajectory.get_duration() << " [s]." << std::endl;
+
     
-    // Constraint initial and final states ---------------
+     // ---------- SOLVE POLYMPC ---------- //
+
+    // Constraint initial and final state ---------------
     const double eps = 1e-2;
     mpc.final_state_bounds(final_state.array() - eps, final_state.array() + eps);
 
-    mpc_t::state_t x0; x0 << 0.0, 0.0, 0.0, -1.5, 0.0, 1.5, 0.0,
-                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+    mpc_t::state_t x0; x0 << Map<Matrix<double, 7, 1> >(planner.init_position.data()),
+                             Map<Matrix<double, 7, 1> >(planner.init_velocity.data());
     mpc.initial_conditions(x0);
 
+    // Warm start solver
     mpc.x_guess(x0.replicate(mpc.ocp().NUM_NODES,1));	
     
 
     // Solve problem and print solution 
     for(int i=0; i<5; i++){
-        auto start = system_clock::now();
+        auto start = std::chrono::system_clock::now();
 
         mpc.solve(); 
         
-        auto stop = system_clock::now();
-        auto duration = duration_cast<microseconds>(stop - start);
+        auto stop = std::chrono::system_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
         double dT = duration.count()*1e-3;
        
         /** retrieve solution and statistics */
@@ -111,7 +136,7 @@ int main(int, char**) {
         std::cout << "Num iterations: " << mpc.info().iter << "\n";
         std::cout << "Solve time: " << dT << " [ms] \n";
 
-        std::cout << "Final time: " << mpc.solution_p().transpose() << endl;
+        std::cout << "Final time: " << mpc.solution_p().transpose() << std::endl;
 
         // std::cout << "Solution X: \n" << mpc.solution_x().reshaped(3, 6).transpose() << "\n";
         // std::cout << "Solution U: " << mpc.solution_u().transpose() << "\n"
@@ -134,11 +159,28 @@ int main(int, char**) {
                 << std::endl;
 
         int nPoints = 100;
+
+        // Log Ruckig trajectory
+        std::array<double, NDOF> new_position, new_velocity, new_acceleration;
+        for (int iPoint = 0; iPoint<nPoints; iPoint++)
+        {
+
+            double time = trajectory.get_duration()/nPoints * iPoint;
+            
+            trajectory.at_time(time, new_position, new_velocity, new_acceleration);
+            
+            logFile << time << " " 
+                    << Map<Matrix<double, 1, 7> >(new_position.data()) << " " 
+                    << Map<Matrix<double, 1, 7> >(new_velocity.data()) << " " 
+                    << Map<Matrix<double, 1, 7> >(new_acceleration.data()) << " " 
+                    << std::endl;
+        }
+
+        // Log Polympc trajectory
         for (int iPoint = 0; iPoint<nPoints; iPoint++)
         {
             double time = 1.0/nPoints * iPoint;
             
-            // Log optimal trajectory
             logFile << time*mpc.solution_p()[0] << " " 
                     << mpc.solution_x_at(time).transpose() << " " 
                     << mpc.solution_u_at(time).transpose() << " " 

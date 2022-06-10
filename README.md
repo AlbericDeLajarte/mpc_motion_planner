@@ -3,6 +3,7 @@
 ## Requires:
 
 - pinocchio
+- ruckig
 - polympc (included as submodule)
 
 ## Comments:

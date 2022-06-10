@@ -2,7 +2,7 @@
 
 PandaWrapper::PandaWrapper(){
 
-    pinocchio::urdf::buildModel("panda-model/panda_arm.urdf", model);
+    pinocchio::urdf::buildModel("robot_utils/panda-model/panda_arm.urdf", model);
         
 }
 
