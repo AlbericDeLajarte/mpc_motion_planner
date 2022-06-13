@@ -12,16 +12,27 @@ int main(int, char**) {
     PandaWrapper robot;
     MotionPlanner planner;
 
+    // Reducing a lot acceleration limits to force it to use longer path 
+    // and generate potential joint limit violations
+    for(int i = 0; i< 7; i++){
+        robot.max_acceleration.at(i) /= 20;
+    }
+
     // ---------- PolyMPC setup ---------- //
 
     // Creates solver
     using mpc_t = MPC<minTime_ocp, MySolver, admm>;
     mpc_t mpc;
 
-    mpc.settings().max_iter = 100; 
+    mpc.settings().max_iter = 3; 
+    mpc.qp_settings().max_iter = 100;
     mpc.settings().line_search_max_iter = 10;
     mpc.set_time_limits(0, 1);
+    mpc.qp_settings().eps_rel = 1e-3;
+    mpc.qp_settings().eps_abs = 1e-3;
     // mpc.m_solver.settings().scaling = 10;
+
+    std::cout << "rel: " << mpc.qp_settings().eps_rel << " abs: " <<  mpc.qp_settings().eps_abs << std::endl;
 
     // State constraints and initialisation ---------------
     mpc_t::state_t lbx; 
@@ -40,8 +51,6 @@ int main(int, char**) {
 
     max_input = Map<Matrix<double, 7, 1> >(robot.max_acceleration.data()); // acceleration limit
     mpc.control_bounds(-max_input, max_input);  
-    // mpc.u_guess(ubu.replicate(mpc.ocp().NUM_NODES,1));
-
     
     // Parameters ------------------
     mpc_t::parameter_t lbp; lbp << 0.0;  // lower bound on time
@@ -59,22 +68,26 @@ int main(int, char**) {
     mpc_t::state_t final_state; 
     
     // Search over target configuration until one is inside joint limits
-    while (feasibleTarget == false){
-        qTarget = robot.inverse_kinematic(Matrix3d::Identity(), Vector3d(0.5, 0., 0.5));
-        std::cout << qTarget.transpose() << std::endl;
+    int nTry = 0;
+    while (feasibleTarget == false && nTry < 100){
+        qTarget = robot.inverse_kinematic(Matrix3d::Identity(), Vector3d(0.3, 0., 0.5));
 
         // Final state
         final_state.head(7) = qTarget;
-        final_state.tail(7) = Matrix<double, 7, 1>::Zero();
 
         // Check state constraints violation
         if( (final_state.array() < ubx.array()).all() && (final_state.array() > lbx.array()).all() ){
-            std::cout << "OK" << std::endl;
+            std::cout << "Solved in " << nTry << " trials. Initial state: " << std::endl;
             feasibleTarget = true;
         }
-         
-        else std::cout << "NOT OK" << std::endl;
+        nTry ++;
     }
+
+    // Compute desired final joint speed from cartesian [linear, angular] speed
+    final_state.tail(7) = robot.inverse_velocities(qTarget, Vector3d(0.4, 0., 0.2), Vector3d(0.0, 0.0, 0.0));
+
+    std::cout << final_state.reshaped(7, 2).transpose() << std::endl;
+    
 
     // ---------- Ruckig setup ---------- //
     // Create input parameters
@@ -99,10 +112,10 @@ int main(int, char**) {
     Result result = otg.calculate(input, trajectory);
 
     // Get duration of the trajectory
-    std::cout << "Trajectory duration: " << trajectory.get_duration() << " [s]." << std::endl;
+    std::cout << "Ruckig trajectory duration: " << trajectory.get_duration() << " [s]. \n\n";
 
     
-     // ---------- SOLVE POLYMPC ---------- //
+    // ---------- SOLVE POLYMPC ---------- //
 
     // Constraint initial and final state ---------------
     const double eps = 1e-2;
@@ -142,7 +155,8 @@ int main(int, char**) {
      
 
     // Solve problem and print solution 
-    for(int i=0; i<5; i++){
+    std::cout << " ---------- SOLVING MPC ----------" << std::endl;
+    for(int i=0; i<2; i++){
         auto start = std::chrono::system_clock::now();
 
         mpc.solve(); 
@@ -181,7 +195,7 @@ int main(int, char**) {
         int nPoints = 100;
 
         // Log Ruckig trajectory
-        for (int iPoint = 0; iPoint<nPoints; iPoint++)
+        for (int iPoint = 0; iPoint<=nPoints; iPoint++)
         {
             double time = trajectory.get_duration()/nPoints * iPoint;
             
@@ -195,7 +209,7 @@ int main(int, char**) {
         }
 
         // Log Polympc trajectory
-        for (int iPoint = 0; iPoint<nPoints; iPoint++)
+        for (int iPoint = 0; iPoint<=nPoints; iPoint++)
         {
             double time = 1.0/nPoints * iPoint;
             

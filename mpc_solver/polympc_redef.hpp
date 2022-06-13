@@ -24,6 +24,14 @@ public:
     using typename Base::nlp_variable_t;
     using typename Base::nlp_hessian_t;
 
+    // using typename Base::scalar_t;
+    using typename Base::parameter_t;
+    // using typename Base::nlp_variable_t;
+    using typename Base::nlp_dual_t;
+    using typename Base::nlp_jacobian_t;
+    using typename Base::nlp_constraints_t;
+    // using typename Base::nlp_hessian_t;
+
     EIGEN_STRONG_INLINE Problem
     &
 
@@ -118,6 +126,32 @@ public:
                         const Eigen::Ref<const nlp_variable_t> &grad_step) noexcept {
         this->problem.hessian_update_impl(hessian, x_step, grad_step);
     }
+
+    // ----------------- Fix from Roland ----------------- //
+    // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv //
+
+    EIGEN_STRONG_INLINE void
+    update_linearisation_dense_impl(const Eigen::Ref<const nlp_variable_t>& x, const Eigen::Ref<const parameter_t>& p,
+                                    const Eigen::Ref<const nlp_variable_t>& x_step, const Eigen::Ref<const nlp_dual_t>& lam,
+                                    Eigen::Ref<nlp_variable_t> cost_grad, Eigen::Ref<nlp_hessian_t> lag_hessian,
+                                    Eigen::Ref<nlp_jacobian_t> A, Eigen::Ref<nlp_constraints_t> b) noexcept{
+        this->linearisation_dense_impl(x, p, lam, cost_grad, lag_hessian, A, b);
+    }
+
+    EIGEN_STRONG_INLINE void
+    update_linearisation_sparse_impl(const Eigen::Ref<const nlp_variable_t>& x, const Eigen::Ref<const parameter_t>& p,
+                                    const Eigen::Ref<const nlp_variable_t>& x_step, const Eigen::Ref<const nlp_dual_t>& lam,
+                                    Eigen::Ref<nlp_variable_t> cost_grad, nlp_hessian_t& lag_hessian,
+                                    nlp_jacobian_t& A, Eigen::Ref<nlp_constraints_t> b) noexcept{
+        this->linearisation_sparse_impl(x, p, lam, cost_grad, lag_hessian, A, b);
+    }
+
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ //
+    // ----------------- Fix from Roland ----------------- //
+    
+
 };
+
+
 
 #endif //SRC_POLYMPC_REDEF_HPP

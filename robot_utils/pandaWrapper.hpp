@@ -8,14 +8,17 @@
 #include "pinocchio/parsers/urdf.hpp"
 
 #define NDOF 7
+#define JOINT_ID 7
 
 class PandaWrapper {
 
     pinocchio::Model model;
+    pinocchio::Data data;
     
   public:
     PandaWrapper();
     Eigen::Matrix<double, NDOF, 1> inverse_kinematic(Eigen::Matrix3d orientation, Eigen::Vector3d position);
+    Eigen::Matrix<double, NDOF, 1> inverse_velocities(Eigen::Matrix<double, NDOF, 1> q, Eigen::Vector3d linear_velocity, Eigen::Vector3d angular_velocity);
 
     std::array<double, NDOF> min_position {-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973};
     std::array<double, NDOF> max_position {2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973};
