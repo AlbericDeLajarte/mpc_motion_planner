@@ -26,9 +26,6 @@ int main(int, char**) {
     using mpc_t = MPC<minTime_ocp, MySolver, admm>;
     mpc_t mpc;
 
-    // mpc.ocp().model = robot.model;
-    // mpc.ocp().data = robot.data;
-
     mpc.settings().max_iter = 3; 
     mpc.qp_settings().max_iter = 100;
     mpc.settings().line_search_max_iter = 10;
@@ -65,8 +62,8 @@ int main(int, char**) {
 
     // Non-linear constraints
     mpc_t::constraint_t ubg, lbg;
-    lbg << -inf;
-    ubg << inf;
+    lbg << -100, -100, -100, -100, -100, -100, -100;
+    ubg << 100, 100, 100, 100, 100, 100, 100;
 
     mpc.constraints_bounds(lbg, ubg);
     
@@ -100,7 +97,7 @@ int main(int, char**) {
 
     std::cout << final_state.reshaped(7, 2).transpose() << std::endl;
 
-    std::cout <<  pinocchio::rnea(robot.model, robot.data, qTarget, qTarget, qTarget);
+    // std::cout <<  pinocchio::rnea(mpc.ocp().model, mpc.ocp().data, qTarget, qTarget, qTarget);
     
 
     // ---------- Ruckig setup ---------- //
@@ -170,7 +167,7 @@ int main(int, char**) {
 
     // Solve problem and print solution 
     std::cout << " ---------- SOLVING MPC ----------" << std::endl;
-    for(int i=0; i<2; i++){
+    for(int i=0; i<10; i++){
         auto start = std::chrono::system_clock::now();
 
         mpc.solve(); 

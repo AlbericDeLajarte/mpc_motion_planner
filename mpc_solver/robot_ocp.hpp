@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include <Eigen/Dense>
+#include <unsupported/Eigen/AutoDiff>
 
 #include "polynomials/ebyshev.hpp"
 #include "control/continuous_ocp.hpp"
@@ -15,11 +16,15 @@
 
 #include "pinocchio/algorithm/rnea.hpp"
 #include "pinocchio/parsers/urdf.hpp"
+#include "pinocchio/autodiff/cppad.hpp"
+#include "pinocchio/algorithm/joint-configuration.hpp"
 
 #include <iostream>
 #include <type_traits>
 #include <typeinfo>
 
+using CppAD::AD;
+using CppAD::NearEqual;
 
 // Global variable with rocket parameters and useful methods
 
@@ -32,25 +37,40 @@ using namespace std;
 using Polynomial = polympc::Chebyshev<POLY_ORDER, polympc::GAUSS_LOBATTO, double>;
 using Approximation = polympc::Spline<Polynomial, NUM_SEG>;
 
-POLYMPC_FORWARD_DECLARATION(/*Name*/ minTime_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 1, /*ND*/ 0, /*NG*/ 1, /*TYPE*/ double)
+POLYMPC_FORWARD_DECLARATION(/*Name*/ minTime_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 1, /*ND*/ 0, /*NG*/ 7, /*TYPE*/ double)
 
 using namespace Eigen;
 
 class minTime_ocp : public ContinuousOCP<minTime_ocp, Approximation, SPARSE>{
 public:
+    
+    
+    typedef double Scalar;
+    typedef AD<Scalar> ADScalar;
+
+    typedef pinocchio::ModelTpl<ADScalar> ADModel;
+    typedef ADModel::Data ADData;
+
     ~minTime_ocp() = default;
 
     minTime_ocp(){
 
         pinocchio::urdf::buildModel("robot_utils/panda-model/panda_arm.urdf", model);
 
-        pinocchio::Data new_data(model);
+        test_ad_model = model.cast<ad_scalar_t>();
 
-        data = new_data;
+        
+
+        // pinocchio::ModelTpl<scalar_t>::Data new_data(model);
+        // data = new_data;
     }
 
     pinocchio::Model model;
-    pinocchio::Data data;
+    // pinocchio::ModelTpl<scalar_t>::Data data;
+
+    pinocchio::ModelTpl<ad_scalar_t> test_ad_model;
+
+    // ADModel ad_model;
 
     template<typename T>
     inline void dynamics_impl(const Eigen::Ref<const state_t<T>> x, const Eigen::Ref<const control_t<T>> u,
@@ -84,70 +104,7 @@ public:
 
 
 
-    // template<typename T>
-    // typename std::enable_if<T == scalar_t>::type
-    // template < typename = typename std::enable_if< true >::type >
-    // inline void inequality_constraints_impl(const Ref<const state_t<scalar_t>> x, const Ref<const control_t<scalar_t>> u,
-    //                                         const Ref<const parameter_t<scalar_t>> p, const Ref<const static_parameter_t> d,
-    //                                         const scalar_t &t, Eigen::Ref<constraint_t<scalar_t>> g) const noexcept
-    // {
-    //     Matrix<double, 7, 1> q;
-    //     Matrix<double, 7, 1> q_dot;
-    //     Matrix<double, 7, 1> q_dot_dot;
-    //     g(0) = u(0);
-    //     // g(0) = pinocchio::rnea(model, data, x.head(7), x.segment(7, 7), u);
-
-    // }
-
-    // template<typename T> 
-    // EIGEN_STRONG_INLINE void
-    // inequality_constraints_impl(const Ref<const state_t<T>> x, const Ref<const control_t<T>> u,
-    //                             const Ref<const parameter_t <T>> p, const Ref<const static_parameter_t> d,
-    //                             const scalar_t &t, Ref<constraint_t < T>>g) const noexcept
-    // {
-    //     g(0) = (T)0.0;
-    // }
-
-
-    // template<typename T> 
-    // template <typename T,
-    //           std::enable_if_t<std::is_same<T,scalar_t>::value, bool> = true>
-    // EIGEN_STRONG_INLINE void
-    // inequality_constraints_impl(const Ref<const state_t<T>> x, const Ref<const control_t<T>> u,
-    //                             const Ref<const parameter_t <T>> p, const Ref<const static_parameter_t> d,
-    //                             const scalar_t &t, Ref<constraint_t < T>>g) const noexcept
-    // {
-    //     // Matrix<double, 7, 1> q;
-    //     // Matrix<double, 7, 1> q_dot;
-    //     // Matrix<double, 7, 1> q_dot_dot;
-    //     Eigen::Ref<Eigen::Matrix<double, 7, 1>> q(x.head(7));
-    //     Eigen::Ref<Eigen::Matrix<double, 7, 1>> q_dot(x.tail(7));
-    //     Eigen::Ref<Eigen::Matrix<double, 7, 1>> q_dot_dot(u);
-
-    //     g(0) = pinocchio::rnea(model, data, q, q_dot, q_dot_dot);
-    // }
-
-    // // template<typename T> 
-    // template <typename T,
-    //           std::enable_if_t<std::is_same<T,ad_scalar_t>::value, bool> = true>
-    // EIGEN_STRONG_INLINE void
-    // inequality_constraints_impl(const Ref<const state_t<T>> x, const Ref<const control_t<T>> u,
-    //                             const Ref<const parameter_t <T>> p, const Ref<const static_parameter_t> d,
-    //                             const scalar_t &t, Ref<constraint_t < T>>g) const noexcept
-    // {
-    //     g(0) = (T)0.0;
-    // }
-
-    // // template<typename T> 
-    // template <typename T,
-    //           std::enable_if_t<std::is_same<T,ad2_scalar_t>::value, bool> = true>
-    // EIGEN_STRONG_INLINE void
-    // inequality_constraints_impl(const Ref<const state_t<T>> x, const Ref<const control_t<T>> u,
-    //                             const Ref<const parameter_t <T>> p, const Ref<const static_parameter_t> d,
-    //                             const scalar_t &t, Ref<constraint_t < T>>g) const noexcept
-    // {
-    //     g(0) = (T)0.0;
-    // }
+   
 
     EIGEN_STRONG_INLINE void
     inequality_constraints_impl(const Ref<const state_t<scalar_t>> x, const Ref<const control_t<scalar_t>> u,
@@ -159,7 +116,11 @@ public:
         Eigen::Matrix<double, 7, 1> q_dot = x.tail(7);
         Eigen::Matrix<double, 7, 1> q_dot_dot = u;
 
-        pinocchio::rnea(model, data, q, q_dot, q_dot_dot);
+        // Matrix<double, 7, 1> qTarget;
+
+        pinocchio::Data data(model);
+
+        g = pinocchio::rnea(model, data, q, q_dot, q_dot_dot);
 
     }
 
@@ -169,7 +130,23 @@ public:
                                 const Ref<const parameter_t <ad_scalar_t>> p, const Ref<const static_parameter_t> d,
                                 const scalar_t &t, Ref<constraint_t <ad_scalar_t>>g) const noexcept
     {
-        // g(0) = (T)0.0;
+        // typedef pinocchio::Model::ConfigVectorType ConfigVectorType;
+        // typedef pinocchio::Model::TangentVectorType TangentVectorType;
+        // ConfigVectorType q(model.nq);
+        // q = pinocchio::randomConfiguration(model);
+        // TangentVectorType v(TangentVectorType::Random(model.nv));
+        // TangentVectorType a(TangentVectorType::Random(model.nv));
+
+        // typedef ADModel::ConfigVectorType ADConfigVectorType;
+        // typedef ADModel::TangentVectorType ADTangentVectorType;
+
+        // ADData ad_data(ad_model);
+
+        // ADConfigVectorType ad_q = q.cast<ADScalar>();
+        // ADTangentVectorType ad_v = v.cast<ADScalar>();
+        // ADTangentVectorType ad_a = a.cast<ADScalar>();
+
+        // g = pinocchio::rnea(ad_model,ad_data,ad_q,ad_v,ad_a);
     }
 
     // template<typename T> 
