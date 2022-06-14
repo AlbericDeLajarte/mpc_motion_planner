@@ -14,3 +14,6 @@ include_directories(submodules/polympc/src mpc_solver robot_utils)
  
 add_executable(mpc_motion_planner src/main.cpp robot_utils/pandaWrapper.cpp)
 target_link_libraries (mpc_motion_planner Eigen3::Eigen pinocchio::pinocchio ruckig::ruckig)
+
+# add_executable(test_param test_param.cpp)
+# target_link_libraries (test_param Eigen3::Eigen)

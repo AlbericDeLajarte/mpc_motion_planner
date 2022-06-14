@@ -1,11 +1,13 @@
 #include "main.hpp"
+#include "pinocchio/algorithm/rnea.hpp"
 
 using namespace Eigen;
 
 using namespace ruckig;
 
-using admm = boxADMM<minTime_ocp::VAR_SIZE, minTime_ocp::NUM_EQ, minTime_ocp::scalar_t,
+using admm = boxADMM<minTime_ocp::VAR_SIZE, minTime_ocp::NUM_EQ + minTime_ocp::NUM_INEQ, minTime_ocp::scalar_t,
                 minTime_ocp::MATRIXFMT, linear_solver_traits<minTime_ocp::MATRIXFMT>::default_solver>;
+
 
 int main(int, char**) { 
 
@@ -15,7 +17,7 @@ int main(int, char**) {
     // Reducing a lot acceleration limits to force it to use longer path 
     // and generate potential joint limit violations
     for(int i = 0; i< 7; i++){
-        robot.max_acceleration.at(i) /= 20;
+        robot.max_acceleration.at(i) /= 1;
     }
 
     // ---------- PolyMPC setup ---------- //
@@ -23,6 +25,9 @@ int main(int, char**) {
     // Creates solver
     using mpc_t = MPC<minTime_ocp, MySolver, admm>;
     mpc_t mpc;
+
+    // mpc.ocp().model = robot.model;
+    // mpc.ocp().data = robot.data;
 
     mpc.settings().max_iter = 3; 
     mpc.qp_settings().max_iter = 100;
@@ -57,6 +62,13 @@ int main(int, char**) {
     mpc_t::parameter_t ubp; ubp << 10;   // upper bound on time
 
     mpc.parameters_bounds(lbp, ubp);
+
+    // Non-linear constraints
+    mpc_t::constraint_t ubg, lbg;
+    lbg << -inf;
+    ubg << inf;
+
+    mpc.constraints_bounds(lbg, ubg);
     
 
 
@@ -70,7 +82,7 @@ int main(int, char**) {
     // Search over target configuration until one is inside joint limits
     int nTry = 0;
     while (feasibleTarget == false && nTry < 100){
-        qTarget = robot.inverse_kinematic(Matrix3d::Identity(), Vector3d(0.3, 0., 0.5));
+        qTarget = robot.inverse_kinematic(Matrix3d::Identity(), Vector3d(0.4, 0., 0.5));
 
         // Final state
         final_state.head(7) = qTarget;
@@ -84,9 +96,11 @@ int main(int, char**) {
     }
 
     // Compute desired final joint speed from cartesian [linear, angular] speed
-    final_state.tail(7) = robot.inverse_velocities(qTarget, Vector3d(0.4, 0., 0.2), Vector3d(0.0, 0.0, 0.0));
+    final_state.tail(7) = robot.inverse_velocities(qTarget, Vector3d(0.5, 0., 0.3), Vector3d(0.0, 0.0, 0.0));
 
     std::cout << final_state.reshaped(7, 2).transpose() << std::endl;
+
+    std::cout <<  pinocchio::rnea(robot.model, robot.data, qTarget, qTarget, qTarget);
     
 
     // ---------- Ruckig setup ---------- //

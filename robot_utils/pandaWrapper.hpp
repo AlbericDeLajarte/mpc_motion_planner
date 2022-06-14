@@ -12,10 +12,13 @@
 
 class PandaWrapper {
 
-    pinocchio::Model model;
-    pinocchio::Data data;
+    
     
   public:
+
+    pinocchio::Model model;
+    pinocchio::Data data;
+
     PandaWrapper();
     Eigen::Matrix<double, NDOF, 1> inverse_kinematic(Eigen::Matrix3d orientation, Eigen::Vector3d position);
     Eigen::Matrix<double, NDOF, 1> inverse_velocities(Eigen::Matrix<double, NDOF, 1> q, Eigen::Vector3d linear_velocity, Eigen::Vector3d angular_velocity);
