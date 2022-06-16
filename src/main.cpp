@@ -26,15 +26,13 @@ int main(int, char**) {
     using mpc_t = MPC<minTime_ocp, MySolver, admm>;
     mpc_t mpc;
 
-    mpc.settings().max_iter = 3; 
-    mpc.qp_settings().max_iter = 100;
+    mpc.settings().max_iter = 10; 
+    mpc.qp_settings().max_iter = 1000;
     mpc.settings().line_search_max_iter = 10;
     mpc.set_time_limits(0, 1);
     mpc.qp_settings().eps_rel = 1e-3;
     mpc.qp_settings().eps_abs = 1e-3;
     // mpc.m_solver.settings().scaling = 10;
-
-    std::cout << "rel: " << mpc.qp_settings().eps_rel << " abs: " <<  mpc.qp_settings().eps_abs << std::endl;
 
     // State constraints and initialisation ---------------
     mpc_t::state_t lbx; 
@@ -62,8 +60,8 @@ int main(int, char**) {
 
     // Non-linear constraints
     mpc_t::constraint_t ubg, lbg;
-    lbg << -100, -100, -100, -100, -100, -100, -100;
-    ubg << 100, 100, 100, 100, 100, 100, 100;
+    lbg << -10, -10, -10, -10, -10, -10, -10;
+    ubg <<  10,  10,  10,  10,  10,  10,  10;
 
     mpc.constraints_bounds(lbg, ubg);
     
@@ -167,7 +165,7 @@ int main(int, char**) {
 
     // Solve problem and print solution 
     std::cout << " ---------- SOLVING MPC ----------" << std::endl;
-    for(int i=0; i<10; i++){
+    for(int i=0; i<1; i++){
         auto start = std::chrono::system_clock::now();
 
         mpc.solve(); 

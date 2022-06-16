@@ -4,7 +4,6 @@
 #include <math.h>
 
 #include <Eigen/Dense>
-#include <unsupported/Eigen/AutoDiff>
 
 #include "polynomials/ebyshev.hpp"
 #include "control/continuous_ocp.hpp"
@@ -16,15 +15,9 @@
 
 #include "pinocchio/algorithm/rnea.hpp"
 #include "pinocchio/parsers/urdf.hpp"
-#include "pinocchio/autodiff/cppad.hpp"
-#include "pinocchio/algorithm/joint-configuration.hpp"
+// #include "pinocchio/algorithm/joint-configuration.hpp"
 
 #include <iostream>
-#include <type_traits>
-#include <typeinfo>
-
-using CppAD::AD;
-using CppAD::NearEqual;
 
 // Global variable with rocket parameters and useful methods
 
@@ -43,34 +36,14 @@ using namespace Eigen;
 
 class minTime_ocp : public ContinuousOCP<minTime_ocp, Approximation, SPARSE>{
 public:
-    
-    
-    typedef double Scalar;
-    typedef AD<Scalar> ADScalar;
-
-    typedef pinocchio::ModelTpl<ADScalar> ADModel;
-    typedef ADModel::Data ADData;
 
     ~minTime_ocp() = default;
 
     minTime_ocp(){
 
         pinocchio::urdf::buildModel("robot_utils/panda-model/panda_arm.urdf", model);
-
-        test_ad_model = model.cast<ad_scalar_t>();
-
-        
-
-        // pinocchio::ModelTpl<scalar_t>::Data new_data(model);
-        // data = new_data;
     }
-
     pinocchio::Model model;
-    // pinocchio::ModelTpl<scalar_t>::Data data;
-
-    pinocchio::ModelTpl<ad_scalar_t> test_ad_model;
-
-    // ADModel ad_model;
 
     template<typename T>
     inline void dynamics_impl(const Eigen::Ref<const state_t<T>> x, const Eigen::Ref<const control_t<T>> u,
@@ -99,14 +72,7 @@ public:
 
 
 
-
-
-
-
-
-   
-
-    EIGEN_STRONG_INLINE void
+EIGEN_STRONG_INLINE void
     inequality_constraints_impl(const Ref<const state_t<scalar_t>> x, const Ref<const control_t<scalar_t>> u,
                                 const Ref<const parameter_t <scalar_t>> p, const Ref<const static_parameter_t> d,
                                 const scalar_t &t, Ref<constraint_t <scalar_t>>g) const noexcept
@@ -115,8 +81,6 @@ public:
         Eigen::Matrix<double, 7, 1> q = x.head(7);
         Eigen::Matrix<double, 7, 1> q_dot = x.tail(7);
         Eigen::Matrix<double, 7, 1> q_dot_dot = u;
-
-        // Matrix<double, 7, 1> qTarget;
 
         pinocchio::Data data(model);
 
@@ -130,23 +94,6 @@ public:
                                 const Ref<const parameter_t <ad_scalar_t>> p, const Ref<const static_parameter_t> d,
                                 const scalar_t &t, Ref<constraint_t <ad_scalar_t>>g) const noexcept
     {
-        // typedef pinocchio::Model::ConfigVectorType ConfigVectorType;
-        // typedef pinocchio::Model::TangentVectorType TangentVectorType;
-        // ConfigVectorType q(model.nq);
-        // q = pinocchio::randomConfiguration(model);
-        // TangentVectorType v(TangentVectorType::Random(model.nv));
-        // TangentVectorType a(TangentVectorType::Random(model.nv));
-
-        // typedef ADModel::ConfigVectorType ADConfigVectorType;
-        // typedef ADModel::TangentVectorType ADTangentVectorType;
-
-        // ADData ad_data(ad_model);
-
-        // ADConfigVectorType ad_q = q.cast<ADScalar>();
-        // ADTangentVectorType ad_v = v.cast<ADScalar>();
-        // ADTangentVectorType ad_a = a.cast<ADScalar>();
-
-        // g = pinocchio::rnea(ad_model,ad_data,ad_q,ad_v,ad_a);
     }
 
     // template<typename T> 
@@ -155,12 +102,9 @@ public:
                                 const Ref<const parameter_t <ad2_scalar_t>> p, const Ref<const static_parameter_t> d,
                                 const scalar_t &t, Ref<constraint_t < ad2_scalar_t>>g) const noexcept
     {
-        // g(0) = (T)0.0;
+        
+        g = constraint_t < ad2_scalar_t>::Zero();
     }
-
-
-
-
 
 
 
