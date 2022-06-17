@@ -28,8 +28,8 @@ int main(int, char**) {
     using mpc_t = MPC<minTime_ocp, MySolver, admm>;
     mpc_t mpc;
 
-    mpc.settings().max_iter = 20; 
-    mpc.qp_settings().max_iter = 1000;
+    mpc.settings().max_iter = 2; 
+    mpc.qp_settings().max_iter = 700;
     mpc.settings().line_search_max_iter = 10;
     mpc.set_time_limits(0, 1);
     mpc.qp_settings().eps_rel = 1e-3;
@@ -65,8 +65,8 @@ int main(int, char**) {
     // lbg << -50, -35, -25, -10, -10, -10, -10;
     // ubg <<  50,  35,  25,  10,  10,  10,  10;
 
-    lbg << -87, -87, -87, -87, -12, -12, -12;
-    ubg <<  87,  87,  87,  87,  12,  12,  12;
+    lbg << -15, -50, -87, -87, -12, -12, -12;
+    ubg <<  15,  50,  87,  87,  12,  12,  12;
 
     mpc.constraints_bounds(lbg, ubg);
     

@@ -28,5 +28,6 @@ class PandaWrapper {
     std::array<double, NDOF> max_velocity {2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100};
     std::array<double, NDOF> max_acceleration {15.0, 7.5, 10.0, 12.5, 15.0, 20.0, 20.0};
     std::array<double, NDOF> max_jerk {7500, 3750, 5000, 6250, 7500, 10000, 10000};
+    
 };
 
