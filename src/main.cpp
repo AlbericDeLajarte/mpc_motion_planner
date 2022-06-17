@@ -17,7 +17,9 @@ int main(int, char**) {
     // Reducing a lot acceleration limits to force it to use longer path 
     // and generate potential joint limit violations
     for(int i = 0; i< 7; i++){
-        robot.max_acceleration.at(i) /= 1;
+        robot.max_velocity.at(i) -= 0.3;
+        robot.max_acceleration.at(i) *= 2;
+        robot.max_jerk.at(i) *= 0.01;
     }
 
     // ---------- PolyMPC setup ---------- //
@@ -26,7 +28,7 @@ int main(int, char**) {
     using mpc_t = MPC<minTime_ocp, MySolver, admm>;
     mpc_t mpc;
 
-    mpc.settings().max_iter = 10; 
+    mpc.settings().max_iter = 20; 
     mpc.qp_settings().max_iter = 1000;
     mpc.settings().line_search_max_iter = 10;
     mpc.set_time_limits(0, 1);
@@ -60,8 +62,11 @@ int main(int, char**) {
 
     // Non-linear constraints
     mpc_t::constraint_t ubg, lbg;
-    lbg << -10, -10, -10, -10, -10, -10, -10;
-    ubg <<  10,  10,  10,  10,  10,  10,  10;
+    // lbg << -50, -35, -25, -10, -10, -10, -10;
+    // ubg <<  50,  35,  25,  10,  10,  10,  10;
+
+    lbg << -87, -87, -87, -87, -12, -12, -12;
+    ubg <<  87,  87,  87,  87,  12,  12,  12;
 
     mpc.constraints_bounds(lbg, ubg);
     
@@ -80,7 +85,7 @@ int main(int, char**) {
         qTarget = robot.inverse_kinematic(Matrix3d::Identity(), Vector3d(0.4, 0., 0.5));
 
         // Final state
-        final_state.head(7) = qTarget;
+        // final_state.head(7) = qTarget;
 
         // Check state constraints violation
         if( (final_state.array() < ubx.array()).all() && (final_state.array() > lbx.array()).all() ){
@@ -90,8 +95,12 @@ int main(int, char**) {
         nTry ++;
     }
 
+    qTarget << 3.14*0.5, -0.936495238095238, -2.3686368421052633, -0.9453, 2.368636842105263, 2.9079545454545457, 0.4281842865538632;
+    final_state.head(7) = qTarget;
+    final_state.tail(7) << 1.80852545,  1.78654623,  1.53257108,  1.82629974, -0.03752599, -1.46085578 , 0.0;
+    final_state.tail(7) *= 0.8;
     // Compute desired final joint speed from cartesian [linear, angular] speed
-    final_state.tail(7) = robot.inverse_velocities(qTarget, Vector3d(0.5, 0., 0.3), Vector3d(0.0, 0.0, 0.0));
+    // final_state.tail(7) = robot.inverse_velocities(qTarget, Vector3d(0.5, 0., 0.3), Vector3d(0.0, 0.0, 0.0));
 
     std::cout << final_state.reshaped(7, 2).transpose() << std::endl;
 
@@ -165,7 +174,7 @@ int main(int, char**) {
 
     // Solve problem and print solution 
     std::cout << " ---------- SOLVING MPC ----------" << std::endl;
-    for(int i=0; i<1; i++){
+    for(int i=0; i<2; i++){
         auto start = std::chrono::system_clock::now();
 
         mpc.solve(); 

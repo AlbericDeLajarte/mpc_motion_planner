@@ -1,5 +1,6 @@
 #include "pinocchio/codegen/cppadcg.hpp"
 #include "pinocchio/algorithm/crba.hpp"
+#include "pinocchio/algorithm/rnea.hpp"
 #include "pinocchio/parsers/urdf.hpp"
 
 #include "pinocchio/algorithm/joint-configuration.hpp"
@@ -24,7 +25,9 @@ int main(int argc, char ** argv)
   // Load the URDF model
   Model model;
   pinocchio::urdf::buildModel("robot_utils/panda-model/panda_arm.urdf", model);
-
+  // model.gravity = pinocchio::Motion(pinocchio::gravity981());
+  model.gravity = pinocchio::Motion::Zero();
+  std::cout << model.gravity << std::endl;
   // CodeGenRNEA<double> rnea_code_gen(model);
   // Generate the lib if it does not exist and load it afterwards.
   // rnea_code_gen.initLib();
@@ -35,9 +38,9 @@ int main(int argc, char ** argv)
   Data data(model);
   
   // Sample a random joint configuration as well as random joint velocity and acceleration
-  Eigen::VectorXd q(7); q << 1.0, -1.0, 0.5, -2.0, 1.0, 2.0, -0.5;
-  Eigen::VectorXd v = 5*q;
-  Eigen::VectorXd a = 10*q;
+  Eigen::VectorXd q(7); q << 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, -1.0;
+  Eigen::VectorXd v = q-q;
+  Eigen::VectorXd a(7); a << 10, 10, 10, 10, 10, 10, 10;
   
   // Allocate result container
   Eigen::MatrixXd djoint_torque_dq = Eigen::MatrixXd::Zero(model.nv,model.nv);
@@ -46,29 +49,39 @@ int main(int argc, char ** argv)
 
   // Computes the inverse dynamics (RNEA) derivatives for all the joints of the robot
   computeRNEADerivatives(model, data, q, v, a, djoint_torque_dq, djoint_torque_dv, djoint_torque_da);
-  double lr = 0.001;
+  crba(model, data, q);
+  double lr = 1e-3;
+
+  // std::cout << data.M << std::endl; 
+  // std::cout << "-------------\n";
 
   std::cout << "Initial state:\n" << q.transpose() << std::endl << v.transpose() << std::endl << a.transpose() << std::endl;
   std::cout << "Initial torque norm: " << data.tau.norm() << std::endl;
+  std::cout << "theoretical minimum torque: " << rnea(model, data, q, v, q-q).transpose() << std::endl;
 
-  for(int i = 0; i< 100; i++){
-
-    if (i%10 == 0) std::cout << "Joint torque: " << data.tau.transpose() << std::endl;
+  
+  for(int i = 0; i< 10000; i++){
 
     // q -= lr*djoint_torque_dq.transpose()*data.tau;
     // v -= 1*lr*djoint_torque_dv.transpose()*data.tau;
-    a -= 100*lr*djoint_torque_da.transpose()*data.tau;
+    // a -= 200*lr*djoint_torque_da.transpose()*data.tau;
 
     computeRNEADerivatives(model, data, q, v, a, djoint_torque_dq, djoint_torque_dv, djoint_torque_da);
+    rnea(model, data, q, v, a);
+    // data.M.triangularView<Eigen::StrictlyLower>() = data.M.transpose().triangularView<Eigen::StrictlyLower>();
+
+    
+
+    a -= 210*lr*data.M.transpose()*data.tau;
+
+    if (i%1000 == 0) {
+      std::cout << "Joint torque: " << data.tau.transpose() << " | Norm = " << data.tau.norm() << std::endl;
+      // std::cout << (data.M).transpose() << std::endl;
+    }
 
   }
 
+
   std::cout << "Final state:\n" << q.transpose() << std::endl << v.transpose() << std::endl << a.transpose() << std::endl;
   std::cout << "Final torque norm: " << data.tau.norm() << std::endl;
-    
-  // Get access to the joint torque
-  
-  // std::cout << "torque variation over q:\n " << djoint_torque_dq << std::endl;
-  // std::cout << "torque variation over q_dot:\n " << djoint_torque_dv << std::endl;
-  // std::cout << "torque variation over q_dot_dot:\n " << djoint_torque_da << std::endl;
 }
