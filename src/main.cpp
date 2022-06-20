@@ -16,11 +16,11 @@ int main(int, char**) {
 
     // Reducing a lot acceleration limits to force it to use longer path 
     // and generate potential joint limit violations
-    for(int i = 0; i< 7; i++){
-        robot.max_velocity.at(i) -= 0.3;
-        robot.max_acceleration.at(i) *= 2;
-        robot.max_jerk.at(i) *= 0.01;
-    }
+    // for(int i = 0; i< 7; i++){
+    //     robot.max_velocity.at(i) -= 0.3;
+    //     robot.max_acceleration.at(i) *= 2;
+    //     robot.max_jerk.at(i) *= 0.01;
+    // }
 
     // ---------- PolyMPC setup ---------- //
 
@@ -41,17 +41,15 @@ int main(int, char**) {
     mpc_t::state_t ubx; 
     
     // Limits from https://frankaemika.github.io/docs/control_parameters.html
-    lbx << Map<Matrix<double, 7, 1> >(robot.min_position.data()),
-          -Map<Matrix<double, 7, 1> >(robot.max_velocity.data());
-    ubx << Map<Matrix<double, 7, 1> >(robot.max_position.data()),
-           Map<Matrix<double, 7, 1> >(robot.max_velocity.data());
+    lbx << robot.min_position, -robot.max_velocity;
+    ubx << robot.max_position, robot.max_velocity;
     mpc.state_bounds(lbx, ubx);
 
     // Input constraints and initialisation -------------
     const double inf = std::numeric_limits<double>::infinity();
     mpc_t::control_t max_input; 
 
-    max_input = Map<Matrix<double, 7, 1> >(robot.max_acceleration.data()); // acceleration limit
+    max_input = robot.max_acceleration; // acceleration limit
     mpc.control_bounds(-max_input, max_input);  
     
     // Parameters ------------------
@@ -67,7 +65,6 @@ int main(int, char**) {
 
     lbg << -15, -50, -87, -87, -12, -12, -12;
     ubg <<  15,  50,  87,  87,  12,  12,  12;
-
     mpc.constraints_bounds(lbg, ubg);
     
 
@@ -102,25 +99,24 @@ int main(int, char**) {
     // Compute desired final joint speed from cartesian [linear, angular] speed
     // final_state.tail(7) = robot.inverse_velocities(qTarget, Vector3d(0.5, 0., 0.3), Vector3d(0.0, 0.0, 0.0));
 
-    std::cout << final_state.reshaped(7, 2).transpose() << std::endl;
+    std::cout << final_state.reshaped(7, 2).transpose() << std::endl;    
 
-    // std::cout <<  pinocchio::rnea(mpc.ocp().model, mpc.ocp().data, qTarget, qTarget, qTarget);
-    
 
     // ---------- Ruckig setup ---------- //
     // Create input parameters
     InputParameter<NDOF> input;
-    input.current_position = planner.init_position;
-    input.current_velocity = planner.init_velocity;
+
+    Matrix<double, 7, 1>::Map(input.current_position.data() ) = planner.init_position;
+    Matrix<double, 7, 1>::Map(input.current_velocity.data() ) = planner.init_velocity;
     input.current_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     Matrix<double, 7, 1>::Map(input.target_position.data() ) = final_state.head(7);
     Matrix<double, 7, 1>::Map(input.target_velocity.data() ) = final_state.tail(7);
     input.target_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-    input.max_velocity = robot.max_velocity;
-    input.max_acceleration = robot.max_acceleration;
-    input.max_jerk = robot.max_jerk;
+    Matrix<double, 7, 1>::Map(input.max_velocity.data() ) = robot.max_velocity;
+    Matrix<double, 7, 1>::Map(input.max_acceleration.data() ) = robot.max_acceleration;
+    Matrix<double, 7, 1>::Map(input.max_jerk.data() ) = robot.max_jerk;
 
     // We don't need to pass the control rate (cycle time) when using only offline features
     Ruckig<NDOF> otg;
@@ -139,8 +135,7 @@ int main(int, char**) {
     const double eps = 1e-2;
     mpc.final_state_bounds(final_state.array() - eps, final_state.array() + eps);
 
-    mpc_t::state_t x0; x0 << Map<Matrix<double, 7, 1> >(planner.init_position.data()),
-                             Map<Matrix<double, 7, 1> >(planner.init_velocity.data());
+    mpc_t::state_t x0; x0 << planner.init_position, planner.init_velocity;
     mpc.initial_conditions(x0);
 
     // Warm start solver
@@ -154,8 +149,6 @@ int main(int, char**) {
     for(auto mpc_time : mpc_time_grid){
 
         trajectory.at_time(mpc_time*trajectory.get_duration(), new_position, new_velocity, new_acceleration);
-
-        // std::cout << mpc_time*trajectory.get_duration() << std::endl;
 
         x_guess.segment(i*NDOF*2, NDOF*2) << Map<Matrix<double, 7, 1> >(new_position.data()),
                                              Map<Matrix<double, 7, 1> >(new_velocity.data());
@@ -199,7 +192,9 @@ int main(int, char**) {
         mpc.p_guess(mpc.solution_p());
     }
 
-    // Write data to txt file
+    // --------- Write data to txt file --------- //
+
+    // Save trajectories
     std::ofstream logFile;
     logFile.open("data/optimal_solution.txt");
     if(logFile.is_open()){
@@ -207,38 +202,65 @@ int main(int, char**) {
         // Log target state
         logFile << 0.0 << " " 
                 << final_state.transpose() << " " 
-                << Matrix<double, 1, 7>::Zero() << " " 
+                << Matrix<double, 1, 14>::Zero() << " " 
                 << std::endl;
 
-        int nPoints = 100;
+        const int nPoints = 100;
 
         // Log Ruckig trajectory
+        Eigen::Matrix<double, 28, nPoints+1> ruckig_traj;
         for (int iPoint = 0; iPoint<=nPoints; iPoint++)
         {
             double time = trajectory.get_duration()/nPoints * iPoint;
             
             trajectory.at_time(time, new_position, new_velocity, new_acceleration);
+
+            ruckig_traj.col(iPoint).head(21) << Map<Matrix<double, 7, 1> >(new_position.data()),
+                                                Map<Matrix<double, 7, 1> >(new_velocity.data()),
+                                                Map<Matrix<double, 7, 1> >(new_acceleration.data());
+
+            ruckig_traj.col(iPoint).tail(7) = 
+            pinocchio::rnea(robot.model, robot.data, ruckig_traj.col(iPoint).head(7),
+                                                     ruckig_traj.col(iPoint).segment(7, 7),
+                                                     ruckig_traj.col(iPoint).segment(14, 7));
             
             logFile << time << " " 
-                    << Map<Matrix<double, 1, 7> >(new_position.data()) << " " 
-                    << Map<Matrix<double, 1, 7> >(new_velocity.data()) << " " 
-                    << Map<Matrix<double, 1, 7> >(new_acceleration.data()) << " " 
+                    << ruckig_traj.col(iPoint).transpose() 
                     << std::endl;
         }
 
         // Log Polympc trajectory
+        Eigen::Matrix<double, 28, nPoints+1> polympc_traj;
         for (int iPoint = 0; iPoint<=nPoints; iPoint++)
         {
             double time = 1.0/nPoints * iPoint;
+
+            polympc_traj.col(iPoint).head(21) << mpc.solution_x_at(time), mpc.solution_u_at(time);
+
+            polympc_traj.col(iPoint).tail(7) = 
+            pinocchio::rnea(robot.model, robot.data, polympc_traj.col(iPoint).head(7),
+                                                     polympc_traj.col(iPoint).segment(7, 7),
+                                                     polympc_traj.col(iPoint).segment(14, 7));
             
             logFile << time*mpc.solution_p()[0] << " " 
-                    << mpc.solution_x_at(time).transpose() << " " 
-                    << mpc.solution_u_at(time).transpose() << " " 
+                    << polympc_traj.col(iPoint).transpose() 
                     << std::endl;
         }
     }
     else {
         std::cout << "\n !! COULD NOT OPEN FILE !!\n Data won't be saved " << std::endl;
+    }
+
+    // Save trajectory performance for benchmark
+
+    std::ofstream benchFile;
+    benchFile.open("data/benchmark_data.txt", std::ios_base::app);
+    if(benchFile.is_open()){
+
+        // Log Ruckig data  
+        trajectory.at_time(trajectory.get_duration(), new_position, new_velocity, new_acceleration);
+
+        // benchFile << 
     }
 
 }
