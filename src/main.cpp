@@ -22,6 +22,12 @@ int main(int, char**) {
     //     robot.max_jerk.at(i) *= 0.01;
     // }
 
+    robot.min_position = robot.min_position.array()+0.3;
+    robot.max_position = robot.max_position.array()-0.3;
+
+    robot.max_velocity *= 0.8;
+    robot.max_acceleration *= 0.7;
+    robot.max_jerk *= 0.01;
     // ---------- PolyMPC setup ---------- //
 
     // Creates solver
@@ -63,9 +69,9 @@ int main(int, char**) {
     // lbg << -50, -35, -25, -10, -10, -10, -10;
     // ubg <<  50,  35,  25,  10,  10,  10,  10;
 
-    lbg << -15, -50, -87, -87, -12, -12, -12;
-    ubg <<  15,  50,  87,  87,  12,  12,  12;
-    mpc.constraints_bounds(lbg, ubg);
+    lbg << -87, -87, -87, -87, -12, -12, -12;
+    ubg <<  87,  87,  87,  87,  12,  12,  12;
+    mpc.constraints_bounds(0.8*lbg, 0.8*ubg);
     
 
 
@@ -92,10 +98,15 @@ int main(int, char**) {
         nTry ++;
     }
 
-    qTarget << 3.14*0.5, -0.936495238095238, -2.3686368421052633, -0.9453, 2.368636842105263, 2.9079545454545457, 0.4281842865538632;
-    final_state.head(7) = qTarget;
-    final_state.tail(7) << 1.80852545,  1.78654623,  1.53257108,  1.82629974, -0.03752599, -1.46085578 , 0.0;
-    final_state.tail(7) *= 0.8;
+    // qTarget << 3.14*0.5, -0.936495238095238, -2.3686368421052633, -0.9453, 2.368636842105263, 2.9079545454545457, 0.4281842865538632;
+    // final_state.head(7) = qTarget;
+    // final_state.tail(7) << 1.80852545,  1.78654623,  1.53257108,  1.82629974, -0.03752599, -1.46085578 , 0.0;
+    // final_state.tail(7) *= 0.8;
+
+    for(int iter =0; iter<100; iter++){
+
+    final_state.head(7) = 0.5*(Matrix<double, 7, 1>::Random().array()*(robot.max_position-robot.min_position).array() + (robot.max_position+robot.min_position).array() );
+    final_state.tail(7) = Matrix<double, 7, 1>::Random().array()*robot.max_velocity.array();
     // Compute desired final joint speed from cartesian [linear, angular] speed
     // final_state.tail(7) = robot.inverse_velocities(qTarget, Vector3d(0.5, 0., 0.3), Vector3d(0.0, 0.0, 0.0));
 
@@ -126,7 +137,7 @@ int main(int, char**) {
     Result result = otg.calculate(input, trajectory);
 
     // Get duration of the trajectory
-    std::cout << "Ruckig trajectory duration: " << trajectory.get_duration() << " [s]. \n\n";
+    // std::cout << "Ruckig trajectory duration: " << trajectory.get_duration() << " [s]. \n\n";
 
     
     // ---------- SOLVE POLYMPC ---------- //
@@ -166,8 +177,8 @@ int main(int, char**) {
      
 
     // Solve problem and print solution 
-    std::cout << " ---------- SOLVING MPC ----------" << std::endl;
-    for(int i=0; i<2; i++){
+    // std::cout << " ---------- SOLVING MPC ----------" << std::endl;
+    for(int i=0; i<1; i++){
         auto start = std::chrono::system_clock::now();
 
         mpc.solve(); 
@@ -193,6 +204,9 @@ int main(int, char**) {
     }
 
     // --------- Write data to txt file --------- //
+    const int nPoints = 100;
+    Eigen::Matrix<double, 28, nPoints+1> ruckig_traj;
+    Eigen::Matrix<double, 28, nPoints+1> polympc_traj;
 
     // Save trajectories
     std::ofstream logFile;
@@ -205,10 +219,7 @@ int main(int, char**) {
                 << Matrix<double, 1, 14>::Zero() << " " 
                 << std::endl;
 
-        const int nPoints = 100;
-
         // Log Ruckig trajectory
-        Eigen::Matrix<double, 28, nPoints+1> ruckig_traj;
         for (int iPoint = 0; iPoint<=nPoints; iPoint++)
         {
             double time = trajectory.get_duration()/nPoints * iPoint;
@@ -230,7 +241,6 @@ int main(int, char**) {
         }
 
         // Log Polympc trajectory
-        Eigen::Matrix<double, 28, nPoints+1> polympc_traj;
         for (int iPoint = 0; iPoint<=nPoints; iPoint++)
         {
             double time = 1.0/nPoints * iPoint;
@@ -260,7 +270,18 @@ int main(int, char**) {
         // Log Ruckig data  
         trajectory.at_time(trajectory.get_duration(), new_position, new_velocity, new_acceleration);
 
-        // benchFile << 
+        // Write extremum of both trajectories
+        for(int i=0; i< 28; i++) benchFile << ruckig_traj.row(i).minCoeff() << " ";
+        for(int i=0; i< 28; i++) benchFile << ruckig_traj.row(i).maxCoeff() << " ";
+        for(int i=0; i< 28; i++) benchFile << polympc_traj.row(i).minCoeff() << " ";
+        for(int i=0; i< 28; i++) benchFile << polympc_traj.row(i).maxCoeff() << " ";
+
+        // Write final state
+        benchFile << (ruckig_traj.col(nPoints).head(14)-final_state).transpose() << " "
+                  << (polympc_traj.col(nPoints).head(14)-final_state).transpose() << std::endl;
+            
+    }
+
     }
 
 }
