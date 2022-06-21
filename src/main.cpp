@@ -14,20 +14,15 @@ int main(int, char**) {
     PandaWrapper robot;
     MotionPlanner planner;
 
-    // Reducing a lot acceleration limits to force it to use longer path 
-    // and generate potential joint limit violations
-    // for(int i = 0; i< 7; i++){
-    //     robot.max_velocity.at(i) -= 0.3;
-    //     robot.max_acceleration.at(i) *= 2;
-    //     robot.max_jerk.at(i) *= 0.01;
-    // }
-
     robot.min_position = robot.min_position.array()+0.3;
     robot.max_position = robot.max_position.array()-0.3;
 
-    robot.max_velocity *= 0.8;
+    robot.max_velocity *= 0.3;
     robot.max_acceleration *= 0.7;
     robot.max_jerk *= 0.01;
+    robot.max_torque *= 1;
+
+    robot.max_torqueDot *= 1;
     // ---------- PolyMPC setup ---------- //
 
     // Creates solver
@@ -64,14 +59,11 @@ int main(int, char**) {
 
     mpc.parameters_bounds(lbp, ubp);
 
-    // Non-linear constraints
+    // Non-linear torque constraints
     mpc_t::constraint_t ubg, lbg;
-    // lbg << -50, -35, -25, -10, -10, -10, -10;
-    // ubg <<  50,  35,  25,  10,  10,  10,  10;
-
-    lbg << -87, -87, -87, -87, -12, -12, -12;
-    ubg <<  87,  87,  87,  87,  12,  12,  12;
-    mpc.constraints_bounds(0.8*lbg, 0.8*ubg);
+    lbg = -robot.max_torque;
+    ubg = robot.max_torque;
+    mpc.constraints_bounds(lbg, ubg);
     
 
 
@@ -103,11 +95,11 @@ int main(int, char**) {
     // final_state.tail(7) << 1.80852545,  1.78654623,  1.53257108,  1.82629974, -0.03752599, -1.46085578 , 0.0;
     // final_state.tail(7) *= 0.8;
 
-    for(int iter =0; iter<100; iter++){
+    for(int iter =0; iter<1000; iter++){
 
     final_state.head(7) = 0.5*(Matrix<double, 7, 1>::Random().array()*(robot.max_position-robot.min_position).array() + (robot.max_position+robot.min_position).array() );
     final_state.tail(7) = Matrix<double, 7, 1>::Random().array()*robot.max_velocity.array();
-    // Compute desired final joint speed from cartesian [linear, angular] speed
+    // // Compute desired final joint speed from cartesian [linear, angular] speed
     // final_state.tail(7) = robot.inverse_velocities(qTarget, Vector3d(0.5, 0., 0.3), Vector3d(0.0, 0.0, 0.0));
 
     std::cout << final_state.reshaped(7, 2).transpose() << std::endl;    
@@ -204,9 +196,12 @@ int main(int, char**) {
     }
 
     // --------- Write data to txt file --------- //
-    const int nPoints = 100;
+    const int nPoints = 200;
     Eigen::Matrix<double, 28, nPoints+1> ruckig_traj;
     Eigen::Matrix<double, 28, nPoints+1> polympc_traj;
+
+    int linear_vel_flag_rk {1}, angular_vel_flag_rk {1}, jerk_flag_rk {1}, torqueDot_flag_rk {1};
+    int linear_vel_flag_mpc {1}, angular_vel_flag_mpc {1}, jerk_flag_mpc {1}, torqueDot_flag_mpc {1};
 
     // Save trajectories
     std::ofstream logFile;
@@ -220,9 +215,11 @@ int main(int, char**) {
                 << std::endl;
 
         // Log Ruckig trajectory
+        double dT = trajectory.get_duration()/nPoints;
+        
         for (int iPoint = 0; iPoint<=nPoints; iPoint++)
         {
-            double time = trajectory.get_duration()/nPoints * iPoint;
+            double time = dT * iPoint;
             
             trajectory.at_time(time, new_position, new_velocity, new_acceleration);
 
@@ -234,6 +231,35 @@ int main(int, char**) {
             pinocchio::rnea(robot.model, robot.data, ruckig_traj.col(iPoint).head(7),
                                                      ruckig_traj.col(iPoint).segment(7, 7),
                                                      ruckig_traj.col(iPoint).segment(14, 7));
+
+            // Check jerk and torque variation
+            if (iPoint >= 1){
+                Matrix<double, 7, 1> jerk = (ruckig_traj.col(iPoint).segment(14, 7)-ruckig_traj.col(iPoint-1).segment(14, 7)) / dT;
+                Matrix<double, 7, 1> torqueDot = (ruckig_traj.col(iPoint).tail(7)-ruckig_traj.col(iPoint-1).tail(7)) / dT;
+
+                if( (jerk.array().abs() > 10*robot.max_jerk.array()).any() ){ // Using 10% margin because RK is driving at the limit
+                    jerk_flag_rk = 0;
+                    // std::cout << "RK: Jerk limit of: " << jerk.transpose() << " at time: " << time << std::endl;
+                } 
+                if( (torqueDot.array().abs() > robot.max_torqueDot).any() ){
+                    torqueDot_flag_rk = 0;
+                    // std::cout << "RK: TorqueDot limit of: " << torqueDot.transpose() << " at time: " << time << std::endl;
+                } 
+            }
+
+            // Check cartesian velocity
+            pinocchio::Data::Matrix6x J(6,7); J.setZero();
+            pinocchio::computeJointJacobian(robot.model, robot.data, ruckig_traj.col(iPoint).head(7), 7, J);
+            Matrix<double, 6, 1> task_velocity = J*ruckig_traj.col(iPoint).segment(7, 7);
+
+            if(task_velocity.head(3).norm() > robot.max_linear_velocity) {
+                linear_vel_flag_rk = 0;
+                // std::cout << "RK: Linear Vel limit of: " << task_velocity.head(3).norm() << " at time: " << time << std::endl;
+            }
+            if(task_velocity.tail(3).norm() > robot.max_angular_velocity) {
+                angular_vel_flag_rk = 0;
+                // std::cout << "RK: Angular Vel limit of: " << task_velocity.tail(3).norm() << " at time: " << time << std::endl;
+            }
             
             logFile << time << " " 
                     << ruckig_traj.col(iPoint).transpose() 
@@ -241,6 +267,7 @@ int main(int, char**) {
         }
 
         // Log Polympc trajectory
+        dT = mpc.solution_p()[0]/nPoints;
         for (int iPoint = 0; iPoint<=nPoints; iPoint++)
         {
             double time = 1.0/nPoints * iPoint;
@@ -252,6 +279,35 @@ int main(int, char**) {
                                                      polympc_traj.col(iPoint).segment(7, 7),
                                                      polympc_traj.col(iPoint).segment(14, 7));
             
+            // Check jerk and torque variation
+            if (iPoint >= 1){
+                Matrix<double, 7, 1> jerk = (polympc_traj.col(iPoint).segment(14, 7)-polympc_traj.col(iPoint-1).segment(14, 7)) / dT;
+                Matrix<double, 7, 1> torqueDot = (polympc_traj.col(iPoint).tail(7)-polympc_traj.col(iPoint-1).tail(7)) / dT;
+
+                if( (jerk.array().abs() > 10*robot.max_jerk.array()).any() ){
+                    jerk_flag_mpc = 0;
+                    // std::cout << "MPC: Jerk limit of: " << jerk.transpose() << " at time: " << time << std::endl;
+                } 
+                if( (torqueDot.array().abs() > robot.max_torqueDot).any() ){
+                    torqueDot_flag_mpc = 0;
+                    std::cout << "MPC: TorqueDot limit of: " << torqueDot.transpose() << " at time: " << time << std::endl;
+                } 
+            }
+
+            // Check cartesian velocity
+            pinocchio::Data::Matrix6x J(6,7); J.setZero();
+            pinocchio::computeJointJacobian(robot.model, robot.data, polympc_traj.col(iPoint).head(7), 7, J);
+            Matrix<double, 6, 1> task_velocity = J*polympc_traj.col(iPoint).segment(7, 7);
+
+            if(task_velocity.head(3).norm() > robot.max_linear_velocity) {
+                linear_vel_flag_mpc = 0;
+                // std::cout << "MPC: Linear Vel limit of: " << task_velocity.head(3).norm() << " at time: " << time << std::endl;
+            }
+            if(task_velocity.tail(3).norm() > robot.max_angular_velocity) {
+                angular_vel_flag_mpc = 0;
+                // std::cout << "MPC: Angular Vel limit of: " << task_velocity.tail(3).norm() << " at time: " << time << std::endl;
+            }
+
             logFile << time*mpc.solution_p()[0] << " " 
                     << polympc_traj.col(iPoint).transpose() 
                     << std::endl;
@@ -278,8 +334,17 @@ int main(int, char**) {
 
         // Write final state
         benchFile << (ruckig_traj.col(nPoints).head(14)-final_state).transpose() << " "
-                  << (polympc_traj.col(nPoints).head(14)-final_state).transpose() << std::endl;
+                  << (polympc_traj.col(nPoints).head(14)-final_state).transpose() << " ";
             
+        benchFile << jerk_flag_rk << " " 
+                  << torqueDot_flag_rk << " " 
+                  << linear_vel_flag_rk << " " 
+                  << angular_vel_flag_rk << " " 
+
+                  << jerk_flag_mpc << " " 
+                  << torqueDot_flag_mpc << " "
+                  << linear_vel_flag_mpc << " " 
+                  << angular_vel_flag_mpc << std::endl;
     }
 
     }
