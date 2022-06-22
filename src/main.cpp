@@ -17,12 +17,13 @@ int main(int, char**) {
     robot.min_position = robot.min_position.array()+0.3;
     robot.max_position = robot.max_position.array()-0.3;
 
-    robot.max_velocity *= 0.3;
-    robot.max_acceleration *= 0.7;
+    robot.max_velocity *= 0.5;
+    // robot.max_velocity  = robot.max_velocity.array() -0.3;
+    robot.max_acceleration *= 0.1;
     robot.max_jerk *= 0.01;
-    robot.max_torque *= 1;
+    robot.max_torque *= 0.7;
 
-    robot.max_torqueDot *= 1;
+    // robot.max_torqueDot *= 0.7;
     // ---------- PolyMPC setup ---------- //
 
     // Creates solver
@@ -90,17 +91,39 @@ int main(int, char**) {
         nTry ++;
     }
 
-    // qTarget << 3.14*0.5, -0.936495238095238, -2.3686368421052633, -0.9453, 2.368636842105263, 2.9079545454545457, 0.4281842865538632;
-    // final_state.head(7) = qTarget;
-    // final_state.tail(7) << 1.80852545,  1.78654623,  1.53257108,  1.82629974, -0.03752599, -1.46085578 , 0.0;
-    // final_state.tail(7) *= 0.8;
+    qTarget << 3.14*0.5, -0.936495238095238, -2.3686368421052633, -0.9453, 2.368636842105263, 2.9079545454545457, 0.4281842865538632;
+    final_state.head(7) = qTarget;
+    final_state.tail(7) << 1.80852545,  1.78654623,  1.53257108,  1.82629974, -0.03752599, -1.46085578 , 0.0;
+    final_state.tail(7) *= 0.8;
 
-    for(int iter =0; iter<1000; iter++){
-
-    final_state.head(7) = 0.5*(Matrix<double, 7, 1>::Random().array()*(robot.max_position-robot.min_position).array() + (robot.max_position+robot.min_position).array() );
-    final_state.tail(7) = Matrix<double, 7, 1>::Random().array()*robot.max_velocity.array();
     // // Compute desired final joint speed from cartesian [linear, angular] speed
     // final_state.tail(7) = robot.inverse_velocities(qTarget, Vector3d(0.5, 0., 0.3), Vector3d(0.0, 0.0, 0.0));
+
+    for(int iter =0; iter<1; iter++){
+
+    // final_state.head(7) = 0.5*(Matrix<double, 7, 1>::Random().array()*(robot.max_position-robot.min_position).array() + (robot.max_position+robot.min_position).array() );
+    // final_state.tail(7) = Matrix<double, 7, 1>::Random().array()*robot.max_velocity.array();
+
+    pinocchio::Data::Matrix6x J(6,7); J.setZero();
+    pinocchio::computeJointJacobian(robot.model, robot.data, final_state.head(7), 7, J);
+    Matrix<double, 6, 1> task_velocity = J*final_state.tail(7);
+    /*
+    if(task_velocity.head(3).norm() > robot.max_linear_velocity) {
+        final_state.tail(7) *= 0.9 * robot.max_linear_velocity / task_velocity.head(3).norm();
+        
+        std::cout << "Linear Vel: " << task_velocity.head(3).norm();
+        task_velocity = J*final_state.tail(7);
+        std::cout << " corrected to : " << task_velocity.head(3).norm()  << std::endl;
+    }
+    if(task_velocity.tail(3).norm() > robot.max_angular_velocity) {
+        final_state.tail(7) *= 0.9 * robot.max_angular_velocity / task_velocity.tail(3).norm();
+        
+        std::cout << "Angular Vel: " << task_velocity.tail(3).norm();
+        task_velocity = J*final_state.tail(7);
+        std::cout << " corrected to : " << task_velocity.tail(3).norm() << std::endl;
+    }*/
+
+    
 
     std::cout << final_state.reshaped(7, 2).transpose() << std::endl;    
 
@@ -248,9 +271,9 @@ int main(int, char**) {
             }
 
             // Check cartesian velocity
-            pinocchio::Data::Matrix6x J(6,7); J.setZero();
+            J.setZero();
             pinocchio::computeJointJacobian(robot.model, robot.data, ruckig_traj.col(iPoint).head(7), 7, J);
-            Matrix<double, 6, 1> task_velocity = J*ruckig_traj.col(iPoint).segment(7, 7);
+            task_velocity = J*ruckig_traj.col(iPoint).segment(7, 7);
 
             if(task_velocity.head(3).norm() > robot.max_linear_velocity) {
                 linear_vel_flag_rk = 0;
@@ -295,9 +318,9 @@ int main(int, char**) {
             }
 
             // Check cartesian velocity
-            pinocchio::Data::Matrix6x J(6,7); J.setZero();
+            J.setZero();
             pinocchio::computeJointJacobian(robot.model, robot.data, polympc_traj.col(iPoint).head(7), 7, J);
-            Matrix<double, 6, 1> task_velocity = J*polympc_traj.col(iPoint).segment(7, 7);
+            task_velocity = J*polympc_traj.col(iPoint).segment(7, 7);
 
             if(task_velocity.head(3).norm() > robot.max_linear_velocity) {
                 linear_vel_flag_mpc = 0;
