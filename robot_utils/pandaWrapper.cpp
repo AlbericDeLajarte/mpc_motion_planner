@@ -75,3 +75,21 @@ Eigen::Matrix<double, NDOF, 1> PandaWrapper::inverse_velocities(Eigen::Matrix<do
     Eigen::Ref<Eigen::Matrix<double, NDOF, 1>> joint_velocity_solution(joint_velocity);
     return joint_velocity_solution;
 }
+
+Eigen::Matrix<double, 6, 1> PandaWrapper::forward_velocities(Eigen::Matrix<double, NDOF, 1> q, Eigen::Matrix<double, NDOF, 1> qdot){
+
+    pinocchio::Data::Matrix6x J(6,7); J.setZero();
+
+    pinocchio::forwardKinematics(model, data, q);
+    pinocchio::computeJointJacobian(model, data, q, 7, J);
+
+    // For some reasons we should rotate the jacobian
+    Eigen::MatrixXd rotateJacobian(6,6); rotateJacobian.setZero();
+    rotateJacobian.block(0,0,3,3) = data.oMi[7].rotation();
+    rotateJacobian.block(3,3,3,3) = data.oMi[7].rotation();
+    J = rotateJacobian * J;
+
+    Eigen::Matrix<double, 6, 1> task_velocity = J*qdot;
+
+    return task_velocity;
+}
