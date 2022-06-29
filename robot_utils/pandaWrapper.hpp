@@ -24,6 +24,8 @@ class PandaWrapper {
     Eigen::Matrix<double, NDOF, 1> inverse_velocities(Eigen::Matrix<double, NDOF, 1> q, Eigen::Vector3d linear_velocity, Eigen::Vector3d angular_velocity);
     Eigen::Matrix<double, 6, 1> forward_velocities(Eigen::Matrix<double, NDOF, 1> q, Eigen::Matrix<double, NDOF, 1> qdot);
 
+
+    // Limits from https://frankaemika.github.io/docs/control_parameters.html
     Eigen::Matrix<double, NDOF, 1> min_position {-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973};
     Eigen::Matrix<double, NDOF, 1> max_position {2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973};
     Eigen::Matrix<double, NDOF, 1> max_velocity {2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100};

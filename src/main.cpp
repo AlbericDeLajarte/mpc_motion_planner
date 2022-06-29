@@ -137,6 +137,8 @@ int main(int, char**) {
 
     std::cout << final_state.reshaped(7, 2).transpose() << std::endl;    
 
+    planner.target_state = final_state;
+
 
     // ---------- Ruckig setup ---------- //
     // Create input parameters
