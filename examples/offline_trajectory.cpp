@@ -5,24 +5,16 @@ int main(int, char**) {
 
     MotionPlanner planner;
 
-    // Add margins on limits
-    planner.robot.min_position = planner.robot.min_position.array()+0.3;
-    planner.robot.max_position = planner.robot.max_position.array()-0.3;
-
-    planner.robot.max_velocity *= 0.5;
-    // planner.robot.max_velocity  = planner.robot.max_velocity.array() -0.3;
-    planner.robot.max_acceleration *= 0.1;
-    planner.robot.max_jerk *= 0.01;
-    planner.robot.max_torque *= 0.7;
-    // planner.robot.max_torqueDot *= 0.7;
+    // Add margins on limits [position, velocity, acceleration, torque, jerk]
+    planner.set_constraint_margins(0.7, 0.5, 0.1, 0.7, 0.01);
     
 
     // ---------- Compute random target state ---------- //
         
     std::srand((unsigned int) time(0));
-    Matrix<double, 7, 1> target_position = 0.5*(Matrix<double, 7, 1>::Random().array()*(planner.robot.max_position - planner.robot.min_position).array() 
+    Matrix<double, 7, 1> target_position = planner.margin_position_*0.5*(Matrix<double, 7, 1>::Random().array()*(planner.robot.max_position - planner.robot.min_position).array() 
                                                 + (planner.robot.max_position + planner.robot.min_position).array() );
-    Matrix<double, 7, 1> target_velocity = Matrix<double, 7, 1>::Random().array()*planner.robot.max_velocity.array();
+    Matrix<double, 7, 1> target_velocity = planner.margin_velocity_*Matrix<double, 7, 1>::Random().array()*planner.robot.max_velocity.array();
 
     Matrix<double, 6, 1> task_velocity = planner.robot.forward_velocities(target_position, target_velocity);
     
@@ -47,18 +39,16 @@ int main(int, char**) {
     std::cout << target_velocity.transpose() << std::endl;
             
     
-    
     // ---------- Solve trajectory ---------- //
 
     planner.set_target_state(target_position, target_velocity);
     planner.solve_trajectory();
 
-    
 
     // --------- Write data to txt file --------- //
     const int nPoints = 200;
 
-    // Save trajectories
+    // Storage for both trajectories
     Eigen::Matrix<double, 29, nPoints+1> ruckig_traj;
     Eigen::Matrix<double, 29, nPoints+1> polympc_traj;
 

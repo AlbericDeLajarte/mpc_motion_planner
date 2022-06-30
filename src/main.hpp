@@ -35,27 +35,8 @@ class MotionPlanner{
             mpc.qp_settings().eps_abs = 1e-3;
             // mpc.m_solver.settings().scaling = 10;
 
-            // State constraints ---------------
-            mpc_t::state_t lbx; lbx << robot.min_position, -robot.max_velocity;
-            mpc_t::state_t ubx; ubx << robot.max_position, robot.max_velocity;
-            mpc.state_bounds(lbx, ubx);
-
-            // Input constraints -------------
-            mpc.control_bounds(-robot.max_acceleration, robot.max_acceleration);  
-            
-            // Parameters ------------------
-            mpc_t::parameter_t lbp; lbp << 0.0;  // lower bound on time
-            mpc_t::parameter_t ubp; ubp << 10;   // upper bound on time
-            mpc.parameters_bounds(lbp, ubp);
-
-            // Non-linear torque constraints
-            mpc.constraints_bounds(-robot.max_torque, robot.max_torque);
-
-            // ---------- Ruckig setup ---------- //
-            Matrix<double, 7, 1>::Map(input.max_velocity.data() ) = robot.max_velocity;
-            Matrix<double, 7, 1>::Map(input.max_acceleration.data() ) = robot.max_acceleration;
-            Matrix<double, 7, 1>::Map(input.max_jerk.data() ) = robot.max_jerk;
-            
+            // Set constraints without margins (1.0) by default
+            set_constraint_margins(1.0, 1.0, 1.0, 1.0, 1.0);
         }
 
         // Creates solver
@@ -70,14 +51,14 @@ class MotionPlanner{
         InputParameter<NDOF> input;
 
         // Robot state and target
-        Eigen::Matrix<double, NDOF, 1> init_position; // to delete
-        Eigen::Matrix<double, NDOF, 1> init_velocity; // to delete
-
         Eigen::Matrix<double, 2*NDOF, 1> current_state;
         Eigen::Matrix<double, 2*NDOF, 1> target_state;
 
         const double eps = 1e-2;
         const double inf = std::numeric_limits<double>::infinity();
+
+        // Margins on bounds
+        double margin_position_, margin_velocity_, margin_acceleration_, margin_torque_, margin_jerk_;
         
 
         void set_target_state(Matrix<double, NDOF, 1> target_position, Matrix<double, NDOF, 1> target_velocity){
@@ -110,6 +91,41 @@ class MotionPlanner{
             Matrix<double, 7, 1>::Map(input.current_position.data() ) = current_position;
             Matrix<double, 7, 1>::Map(input.current_velocity.data() ) = current_velocity;
             input.current_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};    
+        }
+
+        void set_constraint_margins(double margin_position, double margin_velocity, double margin_acceleration, double margin_torque, double margin_jerk){
+
+            // Save margins
+            this->margin_position_ = margin_position;
+            this->margin_velocity_ = margin_velocity;
+            this->margin_acceleration_ = margin_acceleration;
+            this->margin_torque_ = margin_torque;
+            this->margin_jerk_ = margin_jerk;
+
+            // ---------- MPC constraints ---------- //
+
+            // State constraints ---------------
+            mpc_t::state_t lbx; lbx << margin_position*robot.min_position, -margin_velocity*robot.max_velocity;
+            mpc_t::state_t ubx; ubx << margin_position*robot.max_position, margin_velocity*robot.max_velocity;
+            mpc.state_bounds(lbx, ubx);
+
+            // Input constraints -------------
+            mpc.control_bounds(-margin_acceleration*robot.max_acceleration, margin_acceleration*robot.max_acceleration);  
+            
+            // Parameters ------------------
+            mpc_t::parameter_t lbp; lbp << 0.0;  // lower bound on time
+            mpc_t::parameter_t ubp; ubp << 10;   // upper bound on time
+            mpc.parameters_bounds(lbp, ubp);
+
+            // Non-linear torque constraints
+            mpc.constraints_bounds(-margin_torque*robot.max_torque, margin_torque*robot.max_torque);
+
+
+            // ---------- Ruckig constraints ---------- //
+            Matrix<double, 7, 1>::Map(input.max_velocity.data() ) = margin_velocity*robot.max_velocity;
+            Matrix<double, 7, 1>::Map(input.max_acceleration.data() ) = margin_acceleration*robot.max_acceleration;
+            Matrix<double, 7, 1>::Map(input.max_jerk.data() ) = margin_jerk*robot.max_jerk;
+
         }
 
         void warm_start_MPC(){
