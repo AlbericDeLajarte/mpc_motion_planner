@@ -21,3 +21,5 @@ include_directories(submodules/polympc/src mpc_solver robot_utils src)
 add_executable(mpc_benchmark examples/benchmark.cpp robot_utils/pandaWrapper.cpp)
 target_link_libraries (mpc_benchmark Eigen3::Eigen pinocchio::pinocchio ruckig::ruckig)
 
+add_executable(offline_trajectory examples/offline_trajectory.cpp robot_utils/pandaWrapper.cpp)
+target_link_libraries (offline_trajectory Eigen3::Eigen pinocchio::pinocchio ruckig::ruckig)

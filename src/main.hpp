@@ -169,7 +169,7 @@ class MotionPlanner{
         }
 
         template<const int N>
-        void get_ruckig_trajectory(Matrix<double, 7, N+1> &position_trajectory, Matrix<double, 7, N+1> &velocity_trajectory, Matrix<double, 7, N+1> &acceleration_trajectory, Matrix<double, 7, N+1> &torque_trajectory){
+        void get_ruckig_trajectory(Matrix<double, 1, N+1> &time, Matrix<double, 7, N+1> &position_trajectory, Matrix<double, 7, N+1> &velocity_trajectory, Matrix<double, 7, N+1> &acceleration_trajectory, Matrix<double, 7, N+1> &torque_trajectory){
 
             // Check Ruckig trajectory
             double dT = trajectory.get_duration()/N;
@@ -178,9 +178,9 @@ class MotionPlanner{
             
             for (int iPoint = 0; iPoint<=N; iPoint++)
             {
-                double time = dT * iPoint;
+                time(iPoint) = dT * iPoint;
                 
-                trajectory.at_time(time, new_position, new_velocity, new_acceleration);
+                trajectory.at_time(time(iPoint), new_position, new_velocity, new_acceleration);
 
                 position_trajectory.col(iPoint) =  Map<Matrix<double, 7, 1> >(new_position.data()),
                 velocity_trajectory.col(iPoint) =  Map<Matrix<double, 7, 1> >(new_velocity.data()),
@@ -188,11 +188,30 @@ class MotionPlanner{
 
                 torque_trajectory.col(iPoint) =
                 pinocchio::rnea(robot.model, robot.data, position_trajectory.col(iPoint),
-                                                        velocity_trajectory.col(iPoint),
-                                                        acceleration_trajectory.col(iPoint));
-
+                                                         velocity_trajectory.col(iPoint),
+                                                         acceleration_trajectory.col(iPoint));
             }
         }
+
+        template<const int N>
+        void get_MPC_trajectory(Matrix<double, 1, N+1> &time, Matrix<double, 7, N+1> &position_trajectory, Matrix<double, 7, N+1> &velocity_trajectory, Matrix<double, 7, N+1> &acceleration_trajectory, Matrix<double, 7, N+1> &torque_trajectory){
+        
+            for (int iPoint = 0; iPoint<=N; iPoint++)
+            {
+                time(iPoint) = 1.0/N * iPoint;
+                    
+                position_trajectory.col(iPoint) = mpc.solution_x_at(time(iPoint)).head(7);
+                velocity_trajectory.col(iPoint) = mpc.solution_x_at(time(iPoint)).tail(7);
+                acceleration_trajectory.col(iPoint) = mpc.solution_u_at(time(iPoint));
+
+                torque_trajectory.col(iPoint) = 
+                pinocchio::rnea(robot.model, robot.data, position_trajectory.col(iPoint),
+                                                         velocity_trajectory.col(iPoint),
+                                                         acceleration_trajectory.col(iPoint));
+            }
+            time *= mpc.solution_p()[0];
+        }
+
 
         
 };
