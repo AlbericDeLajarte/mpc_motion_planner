@@ -6,11 +6,11 @@ set(CMAKE_BUILD_TYPE Release)
 
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(pinocchio REQUIRED)
-find_package(ruckig REQUIRED)
 
 add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=1000000) # 1 MB
 
 include_directories(submodules/polympc/src mpc_solver robot_utils)
+add_subdirectory(submodules/ruckig)
 
 # add_executable(test_rnea_derivatives test_develop/test_rnea_derivatives.cpp)
 # target_link_libraries (test_rnea_derivatives Eigen3::Eigen pinocchio::pinocchio)
