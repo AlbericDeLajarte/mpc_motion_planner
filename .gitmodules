@@ -2,6 +2,3 @@
 	path = submodules/polympc
 	url = git@gitlab.epfl.ch:listov/polympc.git
 	branch = collocation_fix_jw
-[submodule "submodules/ruckig"]
-	path = submodules/ruckig
-	url = git@github.com:pantor/ruckig.git
