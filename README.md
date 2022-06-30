@@ -2,6 +2,8 @@
 
 A joint space motion planner based on Model Predictive Control (MPC) to find the minimum time trajectory between the current state and target state (position and velocity), while respecting box constraints on joint position, velocity, acceleartion and torque.
 
+The MPC library used is [polyMPC](https://gitlab.epfl.ch/listov/polympc) and we use [Ruckig](https://github.com/pantor/ruckig) as an initial guess for the solver.
+
 ## Installation
 
 ### Requires:
@@ -21,6 +23,3 @@ cd mpc_motion_planner && mkdir build && cd build
 cmake ..
 make
 ```
-
-## Comments:
-- Turn on release mode for ~50 time increase in speed
