@@ -10,12 +10,9 @@ find_package(ruckig REQUIRED)
 
 add_definitions(-DEIGEN_STACK_ALLOCATION_LIMIT=1000000) # 1 MB
 
-include_directories(submodules/polympc/src mpc_solver robot_utils src)
- 
-# add_executable(mpc_motion_planner src/main.cpp robot_utils/pandaWrapper.cpp)
-# target_link_libraries (mpc_motion_planner Eigen3::Eigen pinocchio::pinocchio ruckig::ruckig)
+include_directories(submodules/polympc/src mpc_solver robot_utils)
 
-# add_executable(test_rnea_derivatives test_rnea_derivatives.cpp)
+# add_executable(test_rnea_derivatives test_develop/test_rnea_derivatives.cpp)
 # target_link_libraries (test_rnea_derivatives Eigen3::Eigen pinocchio::pinocchio)
 
 add_executable(mpc_benchmark examples/benchmark.cpp robot_utils/pandaWrapper.cpp)

@@ -1,4 +1,4 @@
-#include "main.hpp"
+#include "motionPlanner.hpp"
 
 
 int main(int, char**) { 
@@ -12,7 +12,7 @@ int main(int, char**) {
     // ---------- Compute random target state ---------- //
         
     std::srand((unsigned int) time(0));
-    
+
     Matrix<double, 7, 1> target_position, target_velocity;
     planner.sample_random_state(target_position, target_velocity);
 
