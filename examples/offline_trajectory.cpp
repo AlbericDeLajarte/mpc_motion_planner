@@ -12,9 +12,9 @@ int main(int, char**) {
     // ---------- Compute random target state ---------- //
         
     std::srand((unsigned int) time(0));
-    Matrix<double, 7, 1> target_position = planner.margin_position_*0.5*(Matrix<double, 7, 1>::Random().array()*(planner.robot.max_position - planner.robot.min_position).array() 
-                                                + (planner.robot.max_position + planner.robot.min_position).array() );
-    Matrix<double, 7, 1> target_velocity = planner.margin_velocity_*Matrix<double, 7, 1>::Random().array()*planner.robot.max_velocity.array();
+    
+    Matrix<double, 7, 1> target_position, target_velocity;
+    planner.sample_random_state(target_position, target_velocity);
 
     Matrix<double, 6, 1> task_velocity = planner.robot.forward_velocities(target_position, target_velocity);
     

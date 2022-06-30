@@ -105,8 +105,9 @@ class MotionPlanner{
             // ---------- MPC constraints ---------- //
 
             // State constraints ---------------
-            mpc_t::state_t lbx; lbx << margin_position*robot.min_position, -margin_velocity*robot.max_velocity;
-            mpc_t::state_t ubx; ubx << margin_position*robot.max_position, margin_velocity*robot.max_velocity;
+            Matrix<double, 7, 1> safety_range_position = (1-margin_position_)*(robot.max_position.array() - robot.min_position.array())/2; // needed because position bounds are not symmetric
+            mpc_t::state_t lbx; lbx << robot.min_position + safety_range_position, -margin_velocity*robot.max_velocity;
+            mpc_t::state_t ubx; ubx << robot.max_position - safety_range_position, margin_velocity*robot.max_velocity;
             mpc.state_bounds(lbx, ubx);
 
             // Input constraints -------------
@@ -126,6 +127,16 @@ class MotionPlanner{
             Matrix<double, 7, 1>::Map(input.max_acceleration.data() ) = margin_acceleration*robot.max_acceleration;
             Matrix<double, 7, 1>::Map(input.max_jerk.data() ) = margin_jerk*robot.max_jerk;
 
+        }
+
+        void sample_random_state(Matrix<double, 7, 1> &random_position, Matrix<double, 7, 1> &random_velocity){
+            
+            Matrix<double, 7, 1> safety_range_position = (1-margin_position_)*(robot.max_position.array() - robot.min_position.array())/2;
+
+            random_position = 0.5*(Matrix<double, 7, 1>::Random().array()*(robot.max_position - robot.min_position - 2*safety_range_position).array() 
+                                                                        + (robot.max_position + robot.min_position).array() );
+
+            random_velocity = margin_velocity_*Matrix<double, 7, 1>::Random().array()*robot.max_velocity.array();
         }
 
         void warm_start_MPC(){
