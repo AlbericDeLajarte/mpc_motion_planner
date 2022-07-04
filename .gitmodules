@@ -1,4 +1,4 @@
 [submodule "submodules/polympc"]
 	path = submodules/polympc
-	url = git@gitlab.epfl.ch:listov/polympc.git
+	url = https://gitlab.epfl.ch/listov/polympc.git
 	branch = collocation_fix_jw
