@@ -9,11 +9,16 @@ int main(int, char**) {
     planner.set_constraint_margins(0.7, 0.5, 0.1, 0.7, 0.01);
     
 
-    // ---------- Compute random target state ---------- //
+    // ---------- Compute random boundary states (initial and final) ---------- //
         
     std::srand((unsigned int) time(0));
+    Matrix<double, 7, 1> target_position, target_velocity, current_position, current_velocity;
 
-    Matrix<double, 7, 1> target_position, target_velocity;
+    // Initial state
+    planner.sample_random_state(current_position, current_velocity);
+    planner.set_current_state(current_position, current_velocity);
+
+    // Final state
     planner.sample_random_state(target_position, target_velocity);
 
     Matrix<double, 6, 1> task_velocity = planner.robot.forward_velocities(target_position, target_velocity);
@@ -35,6 +40,7 @@ int main(int, char**) {
         std::cout << " corrected to : " << task_velocity.tail(3).norm() << std::endl;
     }
 
+    std::cout << "Target: \n";
     std::cout << target_position.transpose() << std::endl;
     std::cout << target_velocity.transpose() << std::endl;
             
@@ -42,7 +48,9 @@ int main(int, char**) {
     // ---------- Solve trajectory ---------- //
 
     planner.set_target_state(target_position, target_velocity);
-    planner.solve_trajectory();
+    
+    bool use_ruckig_as_warm_start = true;
+    planner.solve_trajectory(use_ruckig_as_warm_start);
 
 
     // --------- Write data to txt file --------- //
@@ -53,7 +61,7 @@ int main(int, char**) {
     Eigen::Matrix<double, 29, nPoints+1> polympc_traj;
 
     std::ofstream logFile;
-    logFile.open("data/optimal_solution.txt");
+    logFile.open("analysis/optimal_solution.txt");
     if(logFile.is_open()){
 
         // Log target state

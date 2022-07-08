@@ -62,7 +62,7 @@ class MotionPlanner{
         void sample_random_state(Matrix<double, 7, 1> &random_position, Matrix<double, 7, 1> &random_velocity);
 
         // Solve the OCP to generate the MPC trajectory
-        void solve_trajectory();
+        void solve_trajectory(bool use_ruckig_as_warm_start);
 
         // Get the N points from ruckig trajectory
         template<const int N>

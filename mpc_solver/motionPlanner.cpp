@@ -35,12 +35,10 @@ void MotionPlanner::set_target_state(Matrix<double, NDOF, 1> target_position, Ma
     Matrix<double, 7, 1>::Map(input.target_velocity.data() ) = target_velocity;
     input.target_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};  
 
-    // Warm start when we change target = new trajectory
-    warm_start_MPC();
 }
 
 void MotionPlanner::set_current_state(Matrix<double, NDOF, 1> current_position, Matrix<double, NDOF, 1> current_velocity){
-
+    
     // Update MPC constraints
     current_state.head(7) = current_position;
     current_state.tail(7) = current_velocity;
@@ -51,7 +49,7 @@ void MotionPlanner::set_current_state(Matrix<double, NDOF, 1> current_position, 
     // Update Ruckig constraints
     Matrix<double, 7, 1>::Map(input.current_position.data() ) = current_position;
     Matrix<double, 7, 1>::Map(input.current_velocity.data() ) = current_velocity;
-    input.current_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};    
+    input.current_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};  
 }
 
 void MotionPlanner::set_constraint_margins(double margin_position, double margin_velocity, double margin_acceleration, double margin_torque, double margin_jerk){
@@ -131,7 +129,11 @@ void MotionPlanner::warm_start_MPC(){
     mpc.p_guess(p0); 
 }
 
-void MotionPlanner::solve_trajectory(){
+void MotionPlanner::solve_trajectory(bool use_ruckig_as_warm_start){
+
+     // Warm start with ruckig if needed
+    if (use_ruckig_as_warm_start) warm_start_MPC();
+
     auto start = std::chrono::system_clock::now();
 
     mpc.solve(); 

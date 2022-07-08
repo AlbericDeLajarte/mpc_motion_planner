@@ -48,7 +48,9 @@ int main(int, char**) {
         // ---------- Solve trajectory ---------- //
 
         planner.set_target_state(target_position, target_velocity);
-        planner.solve_trajectory();
+        
+        bool use_ruckig_as_warm_start = true;
+        planner.solve_trajectory(use_ruckig_as_warm_start);
         
 
         // --------- Check trajectories and save results --------- //
@@ -146,7 +148,7 @@ int main(int, char**) {
 
         // Save trajectory performance for benchmark
         std::ofstream benchFile;
-        benchFile.open("data/benchmark_data.txt", std::ios_base::app);
+        benchFile.open("analysis/benchmark_data.txt", std::ios_base::app);
         if(benchFile.is_open()){
 
             // Write extremum of both trajectories
