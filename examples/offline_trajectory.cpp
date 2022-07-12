@@ -6,7 +6,7 @@ int main(int, char**) {
     MotionPlanner planner;
 
     // Add margins on limits [position, velocity, acceleration, torque, jerk]
-    planner.set_constraint_margins(0.7, 0.5, 0.1, 0.7, 0.01);
+    planner.set_constraint_margins(0.8, 0.5, 0.1, 0.7, 0.01);
     
 
     // ---------- Compute random boundary states (initial and final) ---------- //
@@ -20,11 +20,11 @@ int main(int, char**) {
 
     // Final state
     planner.sample_random_state(target_position, target_velocity);
-
-    Matrix<double, 6, 1> task_velocity = planner.robot.forward_velocities(target_position, target_velocity);
     
 
     // Check if task velocity is inside bounds, scale down otherwise
+    Matrix<double, 6, 1> task_velocity = planner.robot.forward_velocities(target_position, target_velocity);
+    
     if(task_velocity.head(3).norm() > planner.robot.max_linear_velocity) { // Linear velocity
         target_velocity *= 0.9 * planner.robot.max_linear_velocity / task_velocity.head(3).norm();
         
@@ -39,15 +39,20 @@ int main(int, char**) {
         task_velocity = planner.robot.forward_velocities(target_position, target_velocity);
         std::cout << " corrected to : " << task_velocity.tail(3).norm() << std::endl;
     }
+    
+    planner.set_target_state(target_position, target_velocity);
 
+    // Check if trajectory is feasible
+    int check_target = planner.check_state_in_bounds(target_position, target_velocity);
+    int check_state = planner.check_state_in_bounds(current_position, current_velocity);
+    if (check_state != 0 || check_target != 0) throw std::runtime_error("Initial or final state outside bounds");
+            
     std::cout << "Target: \n";
     std::cout << target_position.transpose() << std::endl;
     std::cout << target_velocity.transpose() << std::endl;
-            
+    
     
     // ---------- Solve trajectory ---------- //
-
-    planner.set_target_state(target_position, target_velocity);
     
     bool use_ruckig_as_warm_start = true;
     planner.solve_trajectory(use_ruckig_as_warm_start);

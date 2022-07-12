@@ -64,6 +64,9 @@ class MotionPlanner{
         // Solve the OCP to generate the MPC trajectory
         void solve_trajectory(bool use_ruckig_as_warm_start);
 
+        // Check if a given state is feasible
+        int check_state_in_bounds(Matrix<double, 7, 1> &position, Matrix<double, 7, 1> &velocity);
+
         // Get the N points from ruckig trajectory
         template<const int N>
         void get_ruckig_trajectory(Matrix<double, 1, N+1> &time, Matrix<double, 7, N+1> &position_trajectory, Matrix<double, 7, N+1> &velocity_trajectory, Matrix<double, 7, N+1> &acceleration_trajectory, Matrix<double, 7, N+1> &torque_trajectory){

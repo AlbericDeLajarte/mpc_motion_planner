@@ -98,6 +98,31 @@ void MotionPlanner::sample_random_state(Matrix<double, 7, 1> &random_position, M
     random_velocity = margin_velocity_*Matrix<double, 7, 1>::Random().array()*robot.max_velocity.array();
 }
 
+int MotionPlanner::check_state_in_bounds(Matrix<double, 7, 1> &position, Matrix<double, 7, 1> &velocity){
+
+    Matrix<double, 7, 1> safety_range_position = (1-margin_position_)*(robot.max_position.array() - robot.min_position.array())/2;
+
+    bool position_check = ( position.array() > (robot.max_position - safety_range_position).array() ).any()
+                       || ( position.array() < (robot.min_position + safety_range_position).array() ).any() ;
+
+
+    bool velocity_check = ( velocity.array().abs() > margin_velocity_*robot.max_velocity.array() ).any();
+    
+    // By default: no problem
+    int check_flag = 0;
+
+    // Position outside bounds
+    if (position_check && !velocity_check) check_flag = 1;
+
+    // Velocity outside bounds
+    if (!position_check && velocity_check) check_flag = 2;
+
+    // Position and velocity outside bounds
+    if (position_check && velocity_check) check_flag = 3;
+
+    return check_flag;
+}
+
 void MotionPlanner::warm_start_MPC(){
 
     // Compute Ruckig trajectory in an offline manner (outside of the control loop)
