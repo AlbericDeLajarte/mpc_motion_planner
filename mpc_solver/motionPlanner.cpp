@@ -168,15 +168,12 @@ void MotionPlanner::solve_trajectory(bool use_ruckig_as_warm_start){
     double dT = duration.count()*1e-3;
 
     /** retrieve solution and statistics */
-    std::cout << "MPC status: " << mpc.info().status.value << "\n";
-    std::cout << "Num iterations: " << mpc.info().iter << "\n";
-    std::cout << "Solve time: " << dT << " [ms] \n";
+    // std::cout << "MPC status: " << mpc.info().status.value << "\n";
+    // std::cout << "Num iterations: " << mpc.info().iter << "\n";
+    // std::cout << "Solve time: " << dT << " [ms] \n";
 
-    std::cout << "Final time: " << mpc.solution_p().transpose() << std::endl;
-
-    // std::cout << "Solution X: \n" << mpc.solution_x().reshaped(3, 6).transpose() << "\n";
-    // std::cout << "Solution U: " << mpc.solution_u().transpose() << "\n"
-    std::cout << "-------------\n";
+    // std::cout << "Final time: " << mpc.solution_p().transpose() << std::endl;
+    // std::cout << "-------------\n";
 
     mpc.x_guess(mpc.solution_x());	
     mpc.u_guess(mpc.solution_u());

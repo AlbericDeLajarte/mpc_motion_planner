@@ -44,7 +44,7 @@ public:
 
     minTime_ocp(){
 
-        pinocchio::urdf::buildModel("robot_utils/panda-model/panda_arm.urdf", model);
+        pinocchio::urdf::buildModel("/home/ros/ros_ws/src/rospy_zmq_examples/submodules/mpc_motion_planner/robot_utils/panda-model/panda_arm.urdf", model);
     }
     pinocchio::Model model;
 
