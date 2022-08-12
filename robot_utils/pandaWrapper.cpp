@@ -2,7 +2,7 @@
 
 PandaWrapper::PandaWrapper(){
 
-    pinocchio::urdf::buildModel("robot_utils/panda-model/panda_arm.urdf", model);
+    pinocchio::urdf::buildModel("/home/ros/ros_ws/src/rospy_zmq_examples/submodules/mpc_motion_planner/robot_utils/panda-model/panda_arm.urdf", model);
 
     pinocchio::Data new_data(model);
 
@@ -57,9 +57,16 @@ Eigen::Matrix<double, 7, 1> PandaWrapper::inverse_kinematic(Eigen::Matrix3d orie
 Eigen::Matrix<double, NDOF, 1> PandaWrapper::inverse_velocities(Eigen::Matrix<double, NDOF, 1> q, Eigen::Vector3d linear_velocity, Eigen::Vector3d angular_velocity){
 
     // Construct data
-    pinocchio::Data::Matrix6x J(6, model.nv);
-    J.setZero();
+    pinocchio::Data::Matrix6x J(6,7); J.setZero();
+
+    pinocchio::forwardKinematics(model, data, q);
     pinocchio::computeJointJacobian(model, data, q, JOINT_ID, J);
+
+    // For some reasons we should rotate the jacobian
+    Eigen::MatrixXd rotateJacobian(6,6); rotateJacobian.setZero();
+    rotateJacobian.block(0,0,3,3) = data.oMi[7].rotation();
+    rotateJacobian.block(3,3,3,3) = data.oMi[7].rotation();
+    J = rotateJacobian * J;
 
     Eigen::VectorXd joint_velocity(model.nv);
     Eigen::Matrix<double, 6, 1> task_velocity;
