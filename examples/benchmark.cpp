@@ -6,7 +6,7 @@ int main(int, char**) {
     MotionPlanner planner;
 
     // Add margins on limits [position, velocity, acceleration, torque, jerk]
-    planner.set_constraint_margins(0.9, 0.9, 0.5, 0.9, 0.1);
+    planner.set_constraint_margins(0.9, 0.9, 0.6, 0.9, 0.1); 
     
 
     // ---------- Compute random target state ---------- //
