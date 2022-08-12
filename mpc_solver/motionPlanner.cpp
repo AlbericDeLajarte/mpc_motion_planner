@@ -61,6 +61,7 @@ void MotionPlanner::set_constraint_margins(double margin_position, double margin
     this->margin_torque_ = margin_torque;
     this->margin_jerk_ = margin_jerk;
 
+
     // ---------- MPC constraints ---------- //
 
     // State constraints ---------------
@@ -77,8 +78,10 @@ void MotionPlanner::set_constraint_margins(double margin_position, double margin
     mpc_t::parameter_t ubp; ubp << 10;   // upper bound on time
     mpc.parameters_bounds(lbp, ubp);
 
-    // Non-linear torque constraints
-    mpc.constraints_bounds(-margin_torque*robot.max_torque, margin_torque*robot.max_torque);
+    // Non-linear torque constraints + height constraint
+    mpc_t::constraint_t lbg; lbg << -margin_torque*robot.max_torque, robot.min_height;
+    mpc_t::constraint_t ubg; ubg <<  margin_torque*robot.max_torque, inf;
+    mpc.constraints_bounds(lbg, ubg);
 
 
     // ---------- Ruckig constraints ---------- //
@@ -92,8 +95,12 @@ void MotionPlanner::sample_random_state(Matrix<double, 7, 1> &random_position, M
     
     Matrix<double, 7, 1> safety_range_position = (1-margin_position_)*(robot.max_position.array() - robot.min_position.array())/2;
 
+    do {
     random_position = 0.5*(Matrix<double, 7, 1>::Random().array()*(robot.max_position - robot.min_position - 2*safety_range_position).array() 
                                                                 + (robot.max_position + robot.min_position).array() );
+    pinocchio::forwardKinematics(robot.model, robot.data, random_position);
+    } 
+    while (robot.data.oMi[7].translation()[2]< robot.min_height);
 
     random_velocity = margin_velocity_*Matrix<double, 7, 1>::Random().array()*robot.max_velocity.array();
 }

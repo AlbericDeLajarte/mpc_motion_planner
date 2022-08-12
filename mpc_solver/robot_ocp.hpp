@@ -17,6 +17,7 @@
 #include "pinocchio/algorithm/rnea.hpp"
 #include "pinocchio/algorithm/crba.hpp"
 #include "pinocchio/parsers/urdf.hpp"
+#include "pinocchio/algorithm/jacobian.hpp"
 // #include "robotDynamic.hpp"
 // #include "pinocchio/algorithm/joint-configuration.hpp"
 
@@ -33,7 +34,7 @@ using namespace std;
 using Polynomial = polympc::Chebyshev<POLY_ORDER, polympc::GAUSS_LOBATTO, double>;
 using Approximation = polympc::Spline<Polynomial, NUM_SEG>;
 
-POLYMPC_FORWARD_DECLARATION(/*Name*/ minTime_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 1, /*ND*/ 0, /*NG*/ 7, /*TYPE*/ double)
+POLYMPC_FORWARD_DECLARATION(/*Name*/ minTime_ocp, /*NX*/ 14, /*NU*/ 7, /*NP*/ 1, /*ND*/ 0, /*NG*/ 8, /*TYPE*/ double)
 
 using namespace Eigen;
 
@@ -73,18 +74,24 @@ public:
 
 
 
-EIGEN_STRONG_INLINE constraint_t<scalar_t> evalRNEA(const Ref<const state_t<scalar_t>> x, const Ref<const control_t<scalar_t>> u) const noexcept
+EIGEN_STRONG_INLINE constraint_t<scalar_t> evalConstraints(const Ref<const state_t<scalar_t>> x, const Ref<const control_t<scalar_t>> u) const noexcept
 {
     Eigen::Matrix<double, 7, 1> q = x.head(7);
     Eigen::Matrix<double, 7, 1> q_dot = x.tail(7);
     Eigen::Matrix<double, 7, 1> q_dot_dot = u;
 
     pinocchio::Data data(model);
+    pinocchio::forwardKinematics(model, data, q);
 
-    return pinocchio::rnea(model, data, q, q_dot, q_dot_dot);
+    constraint_t<scalar_t> ineq_constraint;
+    ineq_constraint << pinocchio::rnea(model, data, q, q_dot, q_dot_dot),  data.oMi[7].translation()[2];
+
+    // std::cout << "----\n" << ineq_constraint.transpose() << "\n----\n";
+
+    return ineq_constraint;
 }
 
-EIGEN_STRONG_INLINE constraint_t<ad_scalar_t> evalRNEA(const Ref<const state_t<ad_scalar_t>> x, const Ref<const control_t<ad_scalar_t>> u) const noexcept
+EIGEN_STRONG_INLINE constraint_t<ad_scalar_t> evalConstraints(const Ref<const state_t<ad_scalar_t>> x, const Ref<const control_t<ad_scalar_t>> u) const noexcept
 {
     Eigen::Matrix<double, 7, 1> q;
     Eigen::Matrix<double, 7, 1> q_dot;
@@ -112,10 +119,12 @@ EIGEN_STRONG_INLINE constraint_t<ad_scalar_t> evalRNEA(const Ref<const state_t<a
 
     Eigen::MatrixXd djoint_torque_dtime_f = djoint_torque_dv*q_dot + djoint_torque_da*q_dot_dot;
 
-    constraint_t<ad_scalar_t> rnea_constraint;
+    constraint_t<ad_scalar_t> ineq_constraint;
+
+    // Fill in torque derivatives
     Eigen::Matrix<scalar_t, 1, NX + NU + NP> jac_row;
     jac_row.setZero();
-    for(int i = 0; i < NG; i++)
+    for(int i = 0; i < NG-1; i++)
     {   
         // Overwitting with PINOCCHIO data
         jac_row.head(7) = djoint_torque_dq.row(i);
@@ -124,14 +133,31 @@ EIGEN_STRONG_INLINE constraint_t<ad_scalar_t> evalRNEA(const Ref<const state_t<a
 
         jac_row(21) = djoint_torque_dtime_f(i);
 
-        rnea_constraint(i).value() = data.tau(i);
-        rnea_constraint(i).derivatives() = jac_row;
+        ineq_constraint(i).value() = data.tau(i);
+        ineq_constraint(i).derivatives() = jac_row;
     }
 
-    return rnea_constraint;
+    // Fill in height derivative
+    pinocchio::Data::Matrix6x J(6,7); J.setZero();
+
+    pinocchio::forwardKinematics(model, data, q);
+    pinocchio::computeJointJacobian(model, data, q, 7, J);
+
+    // For some reasons we should rotate the jacobian
+    Eigen::MatrixXd rotateJacobian(6,6); rotateJacobian.setZero();
+    rotateJacobian.block(0,0,3,3) = data.oMi[7].rotation();
+    rotateJacobian.block(3,3,3,3) = data.oMi[7].rotation();
+    J = rotateJacobian * J;
+
+    ineq_constraint(NG-1).value() = data.oMi[7].translation()[2];
+    jac_row = Eigen::Matrix<scalar_t, 1, NX + NU + NP>::Zero();
+    jac_row.head(7) = J.row(2);
+    ineq_constraint(NG-1).derivatives() = jac_row;
+
+    return ineq_constraint;
 }
 
-EIGEN_STRONG_INLINE constraint_t<ad2_scalar_t> evalRNEA(const Ref<const state_t<ad2_scalar_t>> x, const Ref<const control_t<ad2_scalar_t>> u) const noexcept
+EIGEN_STRONG_INLINE constraint_t<ad2_scalar_t> evalConstraints(const Ref<const state_t<ad2_scalar_t>> x, const Ref<const control_t<ad2_scalar_t>> u) const noexcept
 {
     return constraint_t<ad2_scalar_t>::Zero();
 }
@@ -143,7 +169,7 @@ inequality_constraints_impl(const Ref<const state_t<T>> x, const Ref<const contr
                             const Ref<const parameter_t <T>> p, const Ref<const static_parameter_t> d,
                             const scalar_t &t, Ref<constraint_t < T>>g) const noexcept
 {
-    g = evalRNEA(x, u);
+    g = evalConstraints(x, u);
 }
     
 

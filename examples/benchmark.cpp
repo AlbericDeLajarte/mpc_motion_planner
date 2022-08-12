@@ -6,7 +6,7 @@ int main(int, char**) {
     MotionPlanner planner;
 
     // Add margins on limits [position, velocity, acceleration, torque, jerk]
-    planner.set_constraint_margins(0.7, 0.5, 0.1, 0.7, 0.01);
+    planner.set_constraint_margins(0.9, 0.9, 0.5, 0.9, 0.1);
     
 
     // ---------- Compute random target state ---------- //
@@ -64,8 +64,8 @@ int main(int, char**) {
         Matrix<double, 7, nPoints+1> position_trajectory, velocity_trajectory, acceleration_trajectory, torque_trajectory;
         Matrix<double, 1, nPoints+1> time;
 
-        int linear_vel_flag_rk {1}, angular_vel_flag_rk {1}, jerk_flag_rk {1}, torqueDot_flag_rk {1};
-        int linear_vel_flag_mpc {1}, angular_vel_flag_mpc {1}, jerk_flag_mpc {1}, torqueDot_flag_mpc {1};
+        int linear_vel_flag_rk {1}, angular_vel_flag_rk {1}, jerk_flag_rk {1}, torqueDot_flag_rk {1}, collision_flag_rk {1};
+        int linear_vel_flag_mpc {1}, angular_vel_flag_mpc {1}, jerk_flag_mpc {1}, torqueDot_flag_mpc {1}, collision_flag_mpc {1};
         
         // --------- RUCKIG --------- //
         // Get trajectory
@@ -102,6 +102,13 @@ int main(int, char**) {
             if(task_velocity.tail(3).norm() > planner.robot.max_angular_velocity) {
                 angular_vel_flag_rk = 0;
                 // std::cout << "RK: Angular Vel limit of: " << task_velocity.tail(3).norm() << " at time: " << dT*iPoint << std::endl;
+            }
+
+            // Check table collision
+            pinocchio::forwardKinematics(planner.robot.model, planner.robot.data, position_trajectory.col(iPoint));
+            if(planner.robot.data.oMi[7].translation()[2]< 0.16) {
+                collision_flag_rk = 0;
+                std::cout << "RK Table collision: " << planner.robot.data.oMi[7].translation()[2] << std::endl;
             }
         }
 
@@ -141,9 +148,14 @@ int main(int, char**) {
                 angular_vel_flag_mpc = 0;
                 // std::cout << "MPC: Angular Vel limit of: " << task_velocity.tail(3).norm() << " at time: " << dT*iPoint << std::endl;
             }
+
+            // Check table collision
+            pinocchio::forwardKinematics(planner.robot.model, planner.robot.data, position_trajectory.col(iPoint));
+            if(planner.robot.data.oMi[7].translation()[2]< 0.16) {
+                collision_flag_mpc = 0;
+                std::cout << "MPC Table collision: " << planner.robot.data.oMi[7].translation()[2] << std::endl;
+            }
         }
-
-
 
 
         // Save trajectory performance for benchmark
@@ -158,19 +170,25 @@ int main(int, char**) {
             for(int i=1; i< 29; i++) benchFile << polympc_traj.row(i).maxCoeff() << " ";
 
             // Write final state to check accuracy
-            benchFile << (ruckig_traj.col(nPoints).head(7)-target_position).transpose() << " "
-                      << (ruckig_traj.col(nPoints).segment(7,7)-target_velocity).transpose() << " "
-                      << (polympc_traj.col(nPoints).head(7)-target_position).transpose() << " "
-                      << (polympc_traj.col(nPoints).segment(7,7)-target_velocity).transpose() << " ";
+            benchFile << (ruckig_traj.col(nPoints).segment(1,7)-target_position).transpose() << " "
+                      << (ruckig_traj.col(nPoints).segment(8,7)-target_velocity).transpose() << " "
+                      << (polympc_traj.col(nPoints).segment(1,7)-target_position).transpose() << " "
+                      << (polympc_traj.col(nPoints).segment(8,7)-target_velocity).transpose() << " ";
                 
             // Write pass/fails flags
             benchFile << jerk_flag_rk << " " 
                       << linear_vel_flag_rk << " " 
                       << angular_vel_flag_rk << " " 
+                      << collision_flag_rk << " " 
 
                       << jerk_flag_mpc << " " 
                       << linear_vel_flag_mpc << " " 
-                      << angular_vel_flag_mpc << std::endl;
+                      << angular_vel_flag_mpc << " " 
+                      << collision_flag_mpc << " ";
+
+            // Write target state to check accuracy
+            benchFile << (target_position).transpose() << " "
+                      << (target_velocity).transpose() << std::endl;
         }
 
     }

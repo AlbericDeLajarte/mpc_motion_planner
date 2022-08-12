@@ -36,6 +36,8 @@ class PandaWrapper {
 
     double max_linear_velocity {1.7};
     double max_angular_velocity {2.5};
+
+    double min_height {0.2};
     
 };
 
