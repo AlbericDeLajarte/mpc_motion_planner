@@ -22,7 +22,7 @@ class MotionPlanner{
 
     public:
 
-        MotionPlanner();
+        MotionPlanner(std::string urdf_path);
 
         // PolyMPC solver
         using mpc_t = MPC<minTime_ocp, MySolver, admm>;

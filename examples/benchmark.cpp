@@ -3,10 +3,10 @@
 
 int main(int, char**) { 
 
-    MotionPlanner planner;
+    MotionPlanner planner("robot_utils/panda-model/panda_arm.urdf");
 
     // Add margins on limits [position, velocity, acceleration, torque, jerk]
-    planner.set_constraint_margins(0.9, 0.9, 0.6, 0.9, 0.1); 
+    planner.set_constraint_margins(0.8, 0.8, 0.6, 0.9, 0.1); 
     
 
     // ---------- Compute random target state ---------- //

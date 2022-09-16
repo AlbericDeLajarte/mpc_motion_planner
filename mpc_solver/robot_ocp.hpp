@@ -43,11 +43,11 @@ public:
 
     ~minTime_ocp() = default;
 
-    minTime_ocp(){
-
-        pinocchio::urdf::buildModel("robot_utils/panda-model/panda_arm.urdf", model);
-    }
     pinocchio::Model model;
+
+    void init(std::string urdf_path){
+        pinocchio::urdf::buildModel(urdf_path, model);
+    }
 
     template<typename T>
     inline void dynamics_impl(const Eigen::Ref<const state_t<T>> x, const Eigen::Ref<const control_t<T>> u,

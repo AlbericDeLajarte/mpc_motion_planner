@@ -1,6 +1,6 @@
 #include "motionPlanner.hpp"
 
-MotionPlanner::MotionPlanner(): robot(), mpc(){
+MotionPlanner::MotionPlanner(std::string urdf_path): robot(urdf_path), mpc(){
 
     Matrix<double, NDOF, 1> default_position = (robot.max_position.array() + robot.min_position.array())/2;
 
@@ -8,6 +8,8 @@ MotionPlanner::MotionPlanner(): robot(), mpc(){
     set_current_state(default_position, Matrix<double, NDOF, 1>::Zero());
 
     // ---------- PolyMPC setup ---------- //
+    
+    mpc.ocp().init(urdf_path);
 
     // Solver settings
     mpc.settings().max_iter = 2; 

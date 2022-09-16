@@ -1,8 +1,8 @@
 #include "pandaWrapper.hpp"
 
-PandaWrapper::PandaWrapper(){
+PandaWrapper::PandaWrapper(std::string urdf_path){
 
-    pinocchio::urdf::buildModel("robot_utils/panda-model/panda_arm.urdf", model);
+    pinocchio::urdf::buildModel(urdf_path, model);
 
     pinocchio::Data new_data(model);
 
