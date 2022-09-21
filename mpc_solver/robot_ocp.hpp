@@ -18,6 +18,7 @@
 #include "pinocchio/algorithm/crba.hpp"
 #include "pinocchio/parsers/urdf.hpp"
 #include "pinocchio/algorithm/jacobian.hpp"
+#include "pinocchio/algorithm/frames.hpp"
 // #include "robotDynamic.hpp"
 // #include "pinocchio/algorithm/joint-configuration.hpp"
 
@@ -42,11 +43,13 @@ class minTime_ocp : public ContinuousOCP<minTime_ocp, Approximation, SPARSE>{
 public:
 
     ~minTime_ocp() = default;
+    int frame_id;
 
     pinocchio::Model model;
 
     void init(std::string urdf_path){
         pinocchio::urdf::buildModel(urdf_path, model);
+        frame_id = model.getFrameId("panda_tool");
     }
 
     template<typename T>
@@ -82,9 +85,10 @@ EIGEN_STRONG_INLINE constraint_t<scalar_t> evalConstraints(const Ref<const state
 
     pinocchio::Data data(model);
     pinocchio::forwardKinematics(model, data, q);
+    pinocchio::updateFramePlacement(model,data,frame_id);
 
     constraint_t<scalar_t> ineq_constraint;
-    ineq_constraint << pinocchio::rnea(model, data, q, q_dot, q_dot_dot),  data.oMi[7].translation()[2];
+    ineq_constraint << pinocchio::rnea(model, data, q, q_dot, q_dot_dot),  data.oMf[frame_id].translation()[2];
 
     // std::cout << "----\n" << ineq_constraint.transpose() << "\n----\n";
 
@@ -140,16 +144,17 @@ EIGEN_STRONG_INLINE constraint_t<ad_scalar_t> evalConstraints(const Ref<const st
     // Fill in height derivative
     pinocchio::Data::Matrix6x J(6,7); J.setZero();
 
-    pinocchio::forwardKinematics(model, data, q);
-    pinocchio::computeJointJacobian(model, data, q, 7, J);
+    pinocchio::forwardKinematics(model,data,q);
+    pinocchio::updateFramePlacement(model,data,frame_id);
+    pinocchio::computeFrameJacobian(model, data, q, frame_id, J);
 
     // For some reasons we should rotate the jacobian
     Eigen::MatrixXd rotateJacobian(6,6); rotateJacobian.setZero();
-    rotateJacobian.block(0,0,3,3) = data.oMi[7].rotation();
-    rotateJacobian.block(3,3,3,3) = data.oMi[7].rotation();
+    rotateJacobian.block(0,0,3,3) = data.oMf[frame_id].rotation();
+    rotateJacobian.block(3,3,3,3) = data.oMf[frame_id].rotation();
     J = rotateJacobian * J;
 
-    ineq_constraint(NG-1).value() = data.oMi[7].translation()[2];
+    ineq_constraint(NG-1).value() = data.oMf[frame_id].translation()[2];
     jac_row = Eigen::Matrix<scalar_t, 1, NX + NU + NP>::Zero();
     jac_row.head(7) = J.row(2);
     ineq_constraint(NG-1).derivatives() = jac_row;

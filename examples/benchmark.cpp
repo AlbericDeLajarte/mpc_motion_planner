@@ -106,9 +106,10 @@ int main(int, char**) {
 
             // Check table collision
             pinocchio::forwardKinematics(planner.robot.model, planner.robot.data, position_trajectory.col(iPoint));
-            if(planner.robot.data.oMi[7].translation()[2]< 0.16) {
+            pinocchio::updateFramePlacement(planner.robot.model, planner.robot.data, frame_id);
+            if(planner.robot.data.oMf[planner.robot.joint_id].translation()[2] < 0) {
                 collision_flag_rk = 0;
-                std::cout << "RK Table collision: " << planner.robot.data.oMi[7].translation()[2] << std::endl;
+                std::cout << "RK Table collision: " << planner.robot.data.oMf[planner.robot.joint_id].translation()[2] << std::endl;
             }
         }
 
@@ -151,9 +152,10 @@ int main(int, char**) {
 
             // Check table collision
             pinocchio::forwardKinematics(planner.robot.model, planner.robot.data, position_trajectory.col(iPoint));
-            if(planner.robot.data.oMi[7].translation()[2]< 0.16) {
+            pinocchio::updateFramePlacement(planner.robot.model, planner.robot.data, frame_id);
+            if(planner.robot.data.oMf[planner.robot.joint_id].translation()[2] < 0) {
                 collision_flag_mpc = 0;
-                std::cout << "MPC Table collision: " << planner.robot.data.oMi[7].translation()[2] << std::endl;
+                std::cout << "MPC Table collision: " << planner.robot.data.oMf[planner.robot.joint_id].translation()[2] << std::endl;
             }
         }
 

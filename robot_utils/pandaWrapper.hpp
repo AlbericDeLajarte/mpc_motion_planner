@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pinocchio/parsers/sample-models.hpp"
+#include "pinocchio/algorithm/frames.hpp"
 #include "pinocchio/spatial/explog.hpp"
 #include "pinocchio/algorithm/kinematics.hpp"
 #include "pinocchio/algorithm/jacobian.hpp"
@@ -8,7 +8,6 @@
 #include "pinocchio/parsers/urdf.hpp"
 
 #define NDOF 7
-#define JOINT_ID 7
 
 class PandaWrapper {
 
@@ -18,6 +17,7 @@ class PandaWrapper {
 
     pinocchio::Model model;
     pinocchio::Data data;
+    int frame_id;
 
     PandaWrapper(std::string urdf_path);
     Eigen::Matrix<double, NDOF, 1> inverse_kinematic(Eigen::Matrix3d orientation, Eigen::Vector3d position);
@@ -37,7 +37,7 @@ class PandaWrapper {
     double max_linear_velocity {1.7};
     double max_angular_velocity {2.5};
 
-    double min_height {0.2};
+    double min_height {0.05};
     
 };
 
