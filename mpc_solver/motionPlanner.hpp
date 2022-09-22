@@ -53,7 +53,7 @@ class MotionPlanner{
         void set_target_state(Matrix<double, NDOF, 1> target_position, Matrix<double, NDOF, 1> target_velocity);
 
         // Set the current (initial state) as a constraint
-        void set_current_state(Matrix<double, NDOF, 1> current_position, Matrix<double, NDOF, 1> current_velocity);
+        void set_current_state(Matrix<double, NDOF, 1> current_position, Matrix<double, NDOF, 1> current_velocity, Matrix<double, NDOF, 1> current_acceleration = Matrix<double, NDOF, 1>::Zero());
 
         // Set margins on top of robot constraint. Each margin is the ratio of the initial range to be kept
         void set_constraint_margins(double margin_position, double margin_velocity, double margin_acceleration, double margin_torque, double margin_jerk);
@@ -82,8 +82,8 @@ class MotionPlanner{
                 
                 trajectory.at_time(time(iPoint), new_position, new_velocity, new_acceleration);
 
-                position_trajectory.col(iPoint) =  Map<Matrix<double, 7, 1> >(new_position.data()),
-                velocity_trajectory.col(iPoint) =  Map<Matrix<double, 7, 1> >(new_velocity.data()),
+                position_trajectory.col(iPoint) =  Map<Matrix<double, 7, 1> >(new_position.data());
+                velocity_trajectory.col(iPoint) =  Map<Matrix<double, 7, 1> >(new_velocity.data());
                 acceleration_trajectory.col(iPoint) = Map<Matrix<double, 7, 1> >(new_acceleration.data());
 
                 torque_trajectory.col(iPoint) =
@@ -111,6 +111,32 @@ class MotionPlanner{
                                                             acceleration_trajectory.col(iPoint));
             }
             time *= mpc.solution_p()[0];
+        }
+
+        void get_MPC_point(double time, Matrix<double, 7, 1> &position, Matrix<double, 7, 1> &velocity, Matrix<double, 7, 1> &acceleration, Matrix<double, 7, 1> &torque){
+            
+            if (time < mpc.solution_p()[0]) time /= mpc.solution_p()[0];
+            else time = mpc.solution_p()[0];
+
+            position = mpc.solution_x_at(time).head(7);
+            velocity = mpc.solution_x_at(time).tail(7);
+            acceleration = mpc.solution_u_at(time);
+
+            torque = pinocchio::rnea(robot.model, robot.data, position, velocity, acceleration);
+        }
+
+        void get_RK_point(double time, Matrix<double, 7, 1> &position, Matrix<double, 7, 1> &velocity, Matrix<double, 7, 1> &acceleration, Matrix<double, 7, 1> &torque){
+
+            time = std::min(time, trajectory.get_duration());
+
+            std::array<double, NDOF> new_position, new_velocity, new_acceleration;
+            trajectory.at_time(time, new_position, new_velocity, new_acceleration);
+
+            position = Map<Matrix<double, 7, 1> >(new_position.data());
+            velocity = Map<Matrix<double, 7, 1> >(new_velocity.data());
+            acceleration = Map<Matrix<double, 7, 1> >(new_acceleration.data());
+
+            torque = pinocchio::rnea(robot.model, robot.data, position, velocity, acceleration);
         }
 
 

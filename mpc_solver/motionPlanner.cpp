@@ -39,7 +39,7 @@ void MotionPlanner::set_target_state(Matrix<double, NDOF, 1> target_position, Ma
 
 }
 
-void MotionPlanner::set_current_state(Matrix<double, NDOF, 1> current_position, Matrix<double, NDOF, 1> current_velocity){
+void MotionPlanner::set_current_state(Matrix<double, NDOF, 1> current_position, Matrix<double, NDOF, 1> current_velocity, Matrix<double, NDOF, 1> current_acceleration){
     
     // Update MPC constraints
     current_state.head(7) = current_position;
@@ -47,11 +47,11 @@ void MotionPlanner::set_current_state(Matrix<double, NDOF, 1> current_position, 
 
     mpc.initial_conditions(current_state);
 
-
     // Update Ruckig constraints
     Matrix<double, 7, 1>::Map(input.current_position.data() ) = current_position;
     Matrix<double, 7, 1>::Map(input.current_velocity.data() ) = current_velocity;
-    input.current_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};  
+    Matrix<double, 7, 1>::Map(input.current_acceleration.data() ) = current_acceleration;
+    // std::cout << 'setting acc ' << current_acceleration.transpose() << std::endl; ;
 }
 
 void MotionPlanner::set_constraint_margins(double margin_position, double margin_velocity, double margin_acceleration, double margin_torque, double margin_jerk){
