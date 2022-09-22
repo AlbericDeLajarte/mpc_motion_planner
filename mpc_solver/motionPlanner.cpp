@@ -184,7 +184,14 @@ void MotionPlanner::solve_trajectory(bool use_ruckig_as_warm_start){
     // std::cout << "Final time: " << mpc.solution_p().transpose() << std::endl;
     // std::cout << "-------------\n";
 
-    mpc.x_guess(mpc.solution_x());	
+
+    // Fix initial and final point at correct place
+    mpc_t::traj_state_t x_guess;
+    x_guess = mpc.solution_x();
+    x_guess.head(mpc_t::nx) = current_state;
+    x_guess.tail(mpc_t::nx) = target_state;
+
+    mpc.x_guess(x_guess);	
     mpc.u_guess(mpc.solution_u());
     mpc.p_guess(mpc.solution_p());
 }
