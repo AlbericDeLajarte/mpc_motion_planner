@@ -132,7 +132,7 @@ int MotionPlanner::check_state_in_bounds(Matrix<double, 7, 1> &position, Matrix<
     return check_flag;
 }
 
-void MotionPlanner::warm_start_MPC(){
+void MotionPlanner::warm_start_RK(){
 
     // Compute Ruckig trajectory in an offline manner (outside of the control loop)
     Result result = otg.calculate(input, trajectory);
@@ -166,7 +166,7 @@ void MotionPlanner::warm_start_MPC(){
 void MotionPlanner::solve_trajectory(bool use_ruckig_as_warm_start){
 
      // Warm start with ruckig if needed
-    if (use_ruckig_as_warm_start) warm_start_MPC();
+    if (use_ruckig_as_warm_start) warm_start_RK();
 
     auto start = std::chrono::system_clock::now();
 

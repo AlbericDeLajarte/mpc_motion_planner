@@ -18,7 +18,7 @@ class MotionPlanner{
     private:
 
         // Solve problem with ruckig to initialize MPC
-        void warm_start_MPC();
+        void warm_start_RK();
 
     public:
 
@@ -137,6 +137,36 @@ class MotionPlanner{
             acceleration = Map<Matrix<double, 7, 1> >(new_acceleration.data());
 
             torque = pinocchio::rnea(robot.model, robot.data, position, velocity, acceleration);
+        }
+
+        // Warm start MPC with given trajectory (should be regularly time spaced)
+        void warm_start(double final_time, MatrixXd position_trajectory, MatrixXd velocity_trajectory, MatrixXd acceleration_trajectory){
+            
+            int nPoint = position_trajectory.cols();
+
+            mpc_t::traj_state_t x_guess;
+            mpc_t::traj_control_t u_guess;
+            mpc_t::parameter_t p0; p0 << final_time;
+
+            auto mpc_time_grid = mpc.ocp().time_nodes;
+            int i = 0;
+            for(auto mpc_time : mpc_time_grid){
+
+                int traj_idx = std::round(mpc_time*(nPoint-1));
+
+                x_guess.segment(i*NDOF*2, NDOF*2) << position_trajectory.col(traj_idx),
+                                                     velocity_trajectory.col(traj_idx);
+
+                u_guess.segment(i*NDOF, NDOF) << acceleration_trajectory.col(traj_idx);;
+
+                i++;
+            } 
+            // std::cout << x_guess << std::endl << x_guess.cols() << " " << x_guess.rows() << std::endl;
+            // std::cout << x_guess.reshaped(14, 13)  << std::endl;
+            // std::cout << u_guess.reshaped(7, 13)  << std::endl;
+            mpc.x_guess(x_guess);	
+            mpc.u_guess(u_guess);
+            mpc.p_guess(p0); 
         }
 
 
