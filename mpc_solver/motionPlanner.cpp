@@ -81,16 +81,23 @@ void MotionPlanner::set_constraint_margins(double margin_position, double margin
     mpc.parameters_bounds(lbp, ubp);
 
     // Non-linear torque constraints + height constraint
-    mpc_t::constraint_t lbg; lbg << -margin_torque*robot.max_torque, robot.min_height;
-    mpc_t::constraint_t ubg; ubg <<  margin_torque*robot.max_torque, inf;
-    mpc.constraints_bounds(lbg, ubg);
-
+    set_min_height(robot.min_height);
 
     // ---------- Ruckig constraints ---------- //
     Matrix<double, 7, 1>::Map(input.max_velocity.data() ) = margin_velocity*robot.max_velocity;
     Matrix<double, 7, 1>::Map(input.max_acceleration.data() ) = margin_acceleration*robot.max_acceleration;
     Matrix<double, 7, 1>::Map(input.max_jerk.data() ) = margin_jerk*robot.max_jerk;
 
+}
+
+void MotionPlanner::set_min_height(double min_height){
+
+    // Non-linear torque constraints + height constraint
+    mpc_t::constraint_t lbg; lbg << -this->margin_torque_*robot.max_torque, min_height;
+    mpc_t::constraint_t ubg; ubg <<  this->margin_torque_*robot.max_torque, inf;
+    mpc.constraints_bounds(lbg, ubg);
+
+    std::cout << lbg.transpose() << std::endl;
 }
 
 void MotionPlanner::sample_random_state(Matrix<double, 7, 1> &random_position, Matrix<double, 7, 1> &random_velocity){

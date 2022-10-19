@@ -58,6 +58,8 @@ class MotionPlanner{
         // Set margins on top of robot constraint. Each margin is the ratio of the initial range to be kept
         void set_constraint_margins(double margin_position, double margin_velocity, double margin_acceleration, double margin_torque, double margin_jerk);
 
+        void set_min_height(double min_height);
+        
         // Return a random position and velocitiy within the bounds (with margin)
         void sample_random_state(Matrix<double, 7, 1> &random_position, Matrix<double, 7, 1> &random_velocity);
 
