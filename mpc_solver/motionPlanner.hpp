@@ -50,7 +50,7 @@ class MotionPlanner{
         double margin_position_, margin_velocity_, margin_acceleration_, margin_torque_, margin_jerk_;
         
         // Set the target (final state) as a constraint
-        void set_target_state(Matrix<double, NDOF, 1> target_position, Matrix<double, NDOF, 1> target_velocity);
+        void set_target_state(Matrix<double, NDOF, 1> target_position, Matrix<double, NDOF, 1> target_velocity, Matrix<double, NDOF, 1> target_acceleration = Matrix<double, NDOF, 1>::Zero());
 
         // Set the current (initial state) as a constraint
         void set_current_state(Matrix<double, NDOF, 1> current_position, Matrix<double, NDOF, 1> current_velocity, Matrix<double, NDOF, 1> current_acceleration = Matrix<double, NDOF, 1>::Zero());
@@ -67,7 +67,7 @@ class MotionPlanner{
         void solve_trajectory(bool use_ruckig_as_warm_start);
 
         // Check if a given state is feasible
-        int check_state_in_bounds(Matrix<double, 7, 1> &position, Matrix<double, 7, 1> &velocity);
+        int check_state_in_bounds(Matrix<double, 7, 1> &position, Matrix<double, 7, 1> &velocity, Matrix<double, 7, 1> acceleration = Matrix<double, NDOF, 1>::Zero());
 
         // Get the N points from ruckig trajectory
         template<const int N>

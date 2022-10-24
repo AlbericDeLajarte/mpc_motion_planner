@@ -24,7 +24,7 @@ MotionPlanner::MotionPlanner(std::string urdf_path): robot(urdf_path), mpc(){
     set_constraint_margins(1.0, 1.0, 1.0, 1.0, 1.0);
 }
 
-void MotionPlanner::set_target_state(Matrix<double, NDOF, 1> target_position, Matrix<double, NDOF, 1> target_velocity){
+void MotionPlanner::set_target_state(Matrix<double, NDOF, 1> target_position, Matrix<double, NDOF, 1> target_velocity, Matrix<double, NDOF, 1> target_acceleration){
 
     // Update MPC constraints
     target_state.head(7) = target_position;
@@ -35,8 +35,7 @@ void MotionPlanner::set_target_state(Matrix<double, NDOF, 1> target_position, Ma
     // Update Ruckig constraints
     Matrix<double, 7, 1>::Map(input.target_position.data() ) = target_position;
     Matrix<double, 7, 1>::Map(input.target_velocity.data() ) = target_velocity;
-    input.target_acceleration = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};  
-
+    Matrix<double, 7, 1>::Map(input.target_acceleration.data() ) = target_acceleration;
 }
 
 void MotionPlanner::set_current_state(Matrix<double, NDOF, 1> current_position, Matrix<double, NDOF, 1> current_velocity, Matrix<double, NDOF, 1> current_acceleration){
@@ -114,7 +113,7 @@ void MotionPlanner::sample_random_state(Matrix<double, 7, 1> &random_position, M
     random_velocity = margin_velocity_*Matrix<double, 7, 1>::Random().array()*robot.max_velocity.array();
 }
 
-int MotionPlanner::check_state_in_bounds(Matrix<double, 7, 1> &position, Matrix<double, 7, 1> &velocity){
+int MotionPlanner::check_state_in_bounds(Matrix<double, 7, 1> &position, Matrix<double, 7, 1> &velocity, Matrix<double, 7, 1> acceleration){
 
     Matrix<double, 7, 1> safety_range_position = (1-margin_position_)*(robot.max_position.array() - robot.min_position.array())/2;
 
@@ -123,6 +122,8 @@ int MotionPlanner::check_state_in_bounds(Matrix<double, 7, 1> &position, Matrix<
 
 
     bool velocity_check = ( velocity.array().abs() > margin_velocity_*robot.max_velocity.array() ).any();
+
+    bool acceleration_check = ( acceleration.array().abs() > margin_acceleration_*robot.max_acceleration.array() ).any();
     
     // By default: no problem
     int check_flag = 0;
@@ -135,6 +136,9 @@ int MotionPlanner::check_state_in_bounds(Matrix<double, 7, 1> &position, Matrix<
 
     // Position and velocity outside bounds
     if (position_check && velocity_check) check_flag = 3;
+
+    // Acceleration outside bounds
+    if (acceleration_check) check_flag += 10;
 
     return check_flag;
 }
