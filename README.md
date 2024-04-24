@@ -11,6 +11,7 @@ We use [polyMPC](https://gitlab.epfl.ch/listov/polympc) as the MPC library and [
 - [pinocchio](https://github.com/stack-of-tasks/pinocchio)
 - [ruckig](https://github.com/pantor/ruckig)
 - [eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) (Version > 3.3)
+- [nlohmann/json](https://github.com/nlohmann/json?tab=readme-ov-file#package-managers)
 
 ### Installation steps
 
