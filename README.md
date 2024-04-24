@@ -9,7 +9,7 @@ We use [polyMPC](https://gitlab.epfl.ch/listov/polympc) as the MPC library and [
 ### Requires:
 
 - [pinocchio](https://github.com/stack-of-tasks/pinocchio)
-
+- [ruckig](https://github.com/pantor/ruckig)
 - [eigen](https://eigen.tuxfamily.org/index.php?title=Main_Page) (Version > 3.3)
 
 ### Installation steps
